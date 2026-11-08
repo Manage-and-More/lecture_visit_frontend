@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState, useTransition } from 'react'
-import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Download, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useToast } from '@/hooks/use-toast'
@@ -92,6 +92,28 @@ export function LectureScreening({ canEdit }: { canEdit: boolean }) {
           <input type="checkbox" checked={filters.onlyWithEmail} onChange={e => update({ onlyWithEmail: e.target.checked })} /> Lecturer email known
         </label>
         {isLoading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+          <details className="relative ml-auto">
+            <summary className="flex h-9 cursor-pointer list-none items-center gap-1.5 rounded-md border bg-white px-3 text-sm hover:bg-black/[0.03]">
+              <Download className="h-4 w-4" /> Download CSV
+            </summary>
+            <div className="absolute right-0 z-20 mt-1 w-72 rounded-lg border bg-white p-1 text-sm shadow-md">
+              {[
+                { kind: 'lectures', label: 'Lectures', hint: 'one row per lecture, with lecturers and programs' },
+                { kind: 'sessions', label: 'Sessions', hint: 'one row per time slot' },
+                { kind: 'programs', label: 'Program links', hint: 'one row per lecture and program' },
+              ].map(file => (
+                <a key={file.kind} download
+                  href={`/api/export/lectures?kind=${file.kind}&university=${filters.university}${filters.onlyTargets ? '&targets=1' : ''}`}
+                  className="block rounded-md px-3 py-2 hover:bg-black/[0.04]">
+                  <div className="font-medium">{file.label}</div>
+                  <div className="text-xs text-muted-foreground">{file.hint}</div>
+                </a>
+              ))}
+              <p className="px-3 pb-2 pt-1 text-xs text-muted-foreground">
+                {filters.onlyTargets ? 'Target lectures' : 'All lectures'} of {filters.university === 'all' ? 'LMU and TUM' : filters.university}, this semester. Other filters don&apos;t apply.
+              </p>
+            </div>
+          </details>
       </div>
 
       {data && !data.scored && (
