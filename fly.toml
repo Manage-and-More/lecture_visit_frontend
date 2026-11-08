@@ -10,7 +10,7 @@ primary_region = "fra"
   # the publishable key only grants what the database's RLS policies allow.
   [build.args]
     NEXT_PUBLIC_SUPABASE_URL = "https://wgdzikstvulyrkuozemb.supabase.co"
-    NEXT_PUBLIC_SUPABASE_ANON_KEY = "REPLACE_WITH_PUBLISHABLE_KEY"
+    NEXT_PUBLIC_SUPABASE_ANON_KEY = "sb_publishable_SVf9FgL5mhis-d9JIkCl8Q_FmG2TpCv"
 
 [http_service]
   internal_port = 3000
