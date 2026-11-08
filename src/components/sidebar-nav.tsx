@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { GraduationCap, Settings, Target, Mail, CalendarDays, Clock } from 'lucide-react'
+import { Settings, Mail, CalendarDays, Clock } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const navItems = [
@@ -20,16 +20,6 @@ const navItems = [
     title: 'My availability',
     href: '/availability',
     icon: Clock
-  },
-  {
-    title: 'Overview',
-    href: '/campaigns',
-    icon: Target
-  },
-  {
-    title: 'Programs',
-    href: '/programs',
-    icon: GraduationCap
   },
   {
     title: 'Settings',

@@ -65,7 +65,7 @@ export function ActiveSemesterSettings({ activeSemester }: ActiveSemesterSetting
             </SelectContent>
           </Select>
           <p className="text-sm text-muted-foreground">
-            This semester will be used as the default for new campaigns and outreach tracking.
+            Outreach, the calendar and visit planning use this semester.
           </p>
         </div>
       </CardContent>
