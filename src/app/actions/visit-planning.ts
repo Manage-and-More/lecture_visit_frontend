@@ -90,6 +90,15 @@ export async function discardVisit(visitId: string): Promise<void> {
 
 export type AvailabilitySlot = { weekday: number; start: string; end: string } // "HH:MM"
 
+/** Whether the signed-in user is on the current visit team (public.team_members). */
+export async function amIOnTheTeam(): Promise<boolean> {
+  const { supabase, userId } = await requireUser()
+  const { data: profile } = await supabase.from('profiles').select('email').eq('id', userId).single()
+  if (!profile?.email) return false
+  const { data } = await supabase.from('team_members').select('email').eq('email', (profile.email as string).toLowerCase()).maybeSingle()
+  return Boolean(data)
+}
+
 export async function getMyAvailability(): Promise<AvailabilitySlot[]> {
   const { supabase, userId } = await requireUser()
   const { data, error } = await supabase.from('member_availability')

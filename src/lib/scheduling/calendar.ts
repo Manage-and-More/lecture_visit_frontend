@@ -239,19 +239,27 @@ export async function loadCalendarWeek(
   return { semester, weekStart: weekStart.toISOString(), sessions, visits, members, truncated }
 }
 
+/** The current team (public.team_members) who have an account, with their weekly availability. */
 export async function loadMembers(db: Db): Promise<CalendarMember[]> {
-  const { data: slots } = await db.from('member_availability').select('profile_id, weekday, start_time, end_time')
+  const { data: team } = await db.from('team_members').select('email, name')
+  const teamNames = new Map((team ?? []).map(t => [(t.email as string).toLowerCase(), t.name as string]))
+  if (teamNames.size === 0) return []
+
+  const { data: profiles } = await db.from('profiles').select('id, email').in('email', [...teamNames.keys()])
+  const profileIds = (profiles ?? []).map(p => p.id as string)
+  const { data: slots } = profileIds.length
+    ? await db.from('member_availability').select('profile_id, weekday, start_time, end_time').in('profile_id', profileIds)
+    : { data: [] }
   const byProfile = new Map<string, Slot[]>()
   for (const s of slots ?? []) {
     const list = byProfile.get(s.profile_id as string) ?? []
     list.push({ weekday: s.weekday as number, start: toMinutes(s.start_time as string), end: toMinutes(s.end_time as string) })
     byProfile.set(s.profile_id as string, list)
   }
-  const { data: profiles } = await db.from('profiles').select('id, display_name, email')
   return (profiles ?? [])
     .map(p => ({
       id: p.id as string,
-      name: (p.display_name as string | null) || (p.email as string | null) || 'Member',
+      name: teamNames.get((p.email as string).toLowerCase()) ?? (p.email as string),
       slots: byProfile.get(p.id as string) ?? [],
     }))
     .sort((a, b) => a.name.localeCompare(b.name, 'de'))

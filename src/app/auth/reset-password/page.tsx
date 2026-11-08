@@ -74,7 +74,7 @@ export default function ResetPasswordPage() {
       <div className="min-h-screen flex items-center justify-center px-4">
         <Card className="w-full max-w-sm">
           <CardHeader className="text-center">
-            <CardTitle className="text-xl">Reset your password</CardTitle>
+            <CardTitle className="text-xl">Set your password</CardTitle>
           </CardHeader>
           <CardContent className="text-center space-y-3">
             <p className="text-sm font-medium">Reset link expired</p>
@@ -98,7 +98,7 @@ export default function ResetPasswordPage() {
       <div className="min-h-screen flex items-center justify-center px-4">
         <Card className="w-full max-w-sm">
           <CardHeader className="text-center">
-            <CardTitle className="text-xl">Reset your password</CardTitle>
+            <CardTitle className="text-xl">Set your password</CardTitle>
           </CardHeader>
           <CardContent className="text-center space-y-3">
             <p className="text-sm font-medium">Password updated!</p>
@@ -121,8 +121,8 @@ export default function ResetPasswordPage() {
     <div className="min-h-screen flex items-center justify-center px-4">
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
-          <CardTitle className="text-xl">Reset your password</CardTitle>
-          <CardDescription>Enter your new password below</CardDescription>
+          <CardTitle className="text-xl">Set your password</CardTitle>
+          <CardDescription>Choose a password for your account</CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-4">
