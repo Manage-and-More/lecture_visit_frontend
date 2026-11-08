@@ -36,26 +36,57 @@ export type LectureScore = {
 }
 
 const TEACHING_RE = /lehramt|teacher|teaching|unterrichtsfach|didaktikfach|berufliche bildung|gymnasi|realschul|grundschul|mittelschul|of education|\b[BM]\.\s?Ed\b|\bsubject\b/i
-const MINOR_RE = /nebenfach|\bminor\b|\bNF\b/i
+const MINOR_RE = /nebenfach|\bminor\b|\bNF\b|exchange|austausch|certificate|zertifikat|graduate studies|skills excellence/i
 const HALL_RE = /hörsaal|hoersaal|audimax|\bHS\s?\d|\bHS\b|\baula\b|interims/i
 
-/** "Informatics [20261], Bachelor of Science" -> "Informatics (B.Sc.)"; "Bachelor Physik" -> "Physik (Bachelor)". */
+const MAX_LABEL = 56
+
+/** Shortens text to `max` characters with "…", keeping a trailing "(degree)" intact. */
+export function truncateLabel(text: string, max = MAX_LABEL): string {
+  if (text.length <= max) return text
+  const suffix = text.match(/\s\([^()]{1,16}\)$/)?.[0] ?? ''
+  const room = max - suffix.length - 1
+  return `${text.slice(0, text.length - suffix.length).slice(0, room).trimEnd()}…${suffix}`
+}
+
+/**
+ * The lecture type as the university states it. For a few TUM lectures the scraper stored a
+ * whole page instead (titles containing "Art" confused it); the type is recovered from it.
+ */
+export function cleanLectureType(type: string | null): string | null {
+  if (!type) return null
+  if (type.length <= 60) return type
+  const match = type.match(/Art\s*([A-ZÄÖÜa-zäöü ,/\-]+\([A-Z]{2,3}\))/)
+  return match ? match[1].trim() : null
+}
+
+/**
+ * Readable program name: "Informatics [20261], Bachelor of Science" -> "Informatics (B.Sc.)",
+ * "Physics, Exchange program (not subject to fees)" -> "Physics (Exchange)",
+ * "Bachelor Physik" -> "Physik (Bachelor)". Long names are cut (see truncateLabel).
+ */
 export function shortProgramName(name: string): string {
-  let n = name.replace(/\s*\[[^\]]*\]/g, '').trim()
+  let n = name.replace(/\s*\[[^\]]*\]/g, '').replace(/\s{2,}/g, ' ').trim()
+  // TUM sometimes repeats the name: "Agricultural Sciences Agricultural Sciences, Bachelor of Science"
+  n = n.replace(/^(.{6,}?)\s+\1(?=,|$)/, '$1')
+  n = n.replace(/^Extension of Degree Program\s+/i, '').replace(/^Exchange program\s+(?=\S.*,\s*Exchange program)/i, '')
   const degrees: [RegExp, string][] = [
     [/,\s*Bachelor of Science.*$/i, 'B.Sc.'], [/,\s*Master of Science.*$/i, 'M.Sc.'],
     [/,\s*Bachelor of Arts.*$/i, 'B.A.'], [/,\s*Master of Arts.*$/i, 'M.A.'],
     [/,\s*Bachelor of Education.*$/i, 'B.Ed.'], [/,\s*Master of Education.*$/i, 'M.Ed.'],
     [/,\s*Bachelor of Engineering.*$/i, 'B.Eng.'], [/,\s*Master of Engineering.*$/i, 'M.Eng.'],
     [/,\s*(State Examination|Staatsexamen).*$/i, 'Staatsexamen'],
+    [/,\s*Exchange program.*$/i, 'Exchange'],
+    [/,\s*[^,]*complementary teaching subject.*$/i, 'Teaching cert.'],
+    [/,\s*Graduate studies with certificate.*$/i, 'Certificate'],
+    [/,\s*Master Brewer Diploma.*$/i, 'Diploma'],
   ]
   for (const [re, abbr] of degrees) {
     if (re.test(n)) return `${n.replace(re, '').trim()} (${abbr})`
   }
   const lead = n.match(/^(Bachelor|Master|Staatsexamen|Lehramt)\s+(.+)$/i)
   if (lead) return `${lead[2]} (${lead[1][0].toUpperCase()}${lead[1].slice(1).toLowerCase()})`
-  n = n.replace(/,\s*$/, '')
-  return n
+  return n.replace(/,\s*$/, '')
 }
 
 function programBase(link: ProgramLink): number {
@@ -89,7 +120,7 @@ function semesterWeight(semester: number | null, winter: boolean): number {
 }
 
 function typeWeight(lectureType: string | null): number {
-  const t = (lectureType ?? '').toLowerCase()
+  const t = (cleanLectureType(lectureType) ?? '').toLowerCase()
   if (t.includes('integrierten') || t.includes('(vi)')) return 0.9
   if (t.includes('vorlesung') || t.includes('(vo)')) return 1
   if (t.includes('übung') || t.includes('(ue)') || t.includes('tutorium')) return 0.35
@@ -136,7 +167,7 @@ export function scoreLecture(lecture: LectureInput, winterSemester: boolean): Le
     if (e.weight < 0.05) continue
     const status = e.link.obligation === 'mandatory' ? 'Mandatory' : e.link.obligation === 'compulsory_elective' ? 'Compulsory elective'
       : e.link.obligation === 'elective' ? 'Elective' : 'Listed'
-    reasons.push([status, semesterLabel(e.link.semester), e.label].filter(Boolean).join(', '))
+    reasons.push([status, semesterLabel(e.link.semester), truncateLabel(e.label)].filter(Boolean).join(', '))
   }
   if (entries.length > 3) reasons.push(`+${entries.length - 3} more programs`)
   if (inLectureHall) reasons.push('Lecture hall')

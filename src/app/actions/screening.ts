@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { activeSemester, requireAdmin, requireUser } from '@/lib/auth'
 import { extrapolateDates } from '@/lib/date-utils'
-import { shortProgramName } from '@/lib/screening/score'
+import { cleanLectureType, shortProgramName } from '@/lib/screening/score'
 import type { LectureSchedule } from '@/types/database'
 
 export type ScreeningFilters = {
@@ -120,7 +120,7 @@ export async function getScreeningPage(filters: ScreeningFilters): Promise<Scree
       id: r.lecture.id,
       title: r.lecture.title,
       university: r.lecture.university?.name ?? '',
-      lectureType: r.lecture.lecture_type,
+      lectureType: cleanLectureType(r.lecture.lecture_type),
       target: targetIds.has(r.lecture.id),
       score: Number(r.score),
       reasons: r.reasons,
