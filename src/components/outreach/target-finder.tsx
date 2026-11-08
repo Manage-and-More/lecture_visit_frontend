@@ -14,13 +14,14 @@ export function TargetFinder() {
   const [result, setResult] = useState<TargetResult | null>(null)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [filter, setFilter] = useState('')
+  const [onlyMatching, setOnlyMatching] = useState(true)
   const [isLoading, startLoading] = useTransition()
   const [isQueueing, startQueueing] = useTransition()
 
-  const load = () => {
+  const load = (matching = onlyMatching) => {
     startLoading(async () => {
       try {
-        const next = await previewTargets()
+        const next = await previewTargets(matching)
         setResult(next)
         setSelected(new Set(next.candidates.map(c => c.professorId)))
       } catch (error) {
@@ -49,7 +50,7 @@ export function TargetFinder() {
   const queue = () => {
     startQueueing(async () => {
       try {
-        const { queued } = await queueOutreach([...selected])
+        const { queued } = await queueOutreach([...selected], onlyMatching)
         toast({ title: `${queued} emails queued`, description: 'They go out with the next check-ins, within the daily limit.' })
         setResult(null)
         setSelected(new Set())
@@ -64,13 +65,26 @@ export function TargetFinder() {
       <CardHeader>
         <CardTitle>Add lecturers</CardTitle>
         <CardDescription>
-          Finds mandatory lectures of starred study programs, plus starred lectures, that still have sessions left.
-          Each lecturer gets one email covering all their lectures.
+          Finds mandatory lectures of starred study programs, plus starred lectures, that still have sessions left and a lecturer
+          with a known email. Each lecturer gets one email covering all their lectures.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={onlyMatching}
+            disabled={isLoading || isQueueing}
+            onChange={e => {
+              setOnlyMatching(e.target.checked)
+              if (result) load(e.target.checked)
+            }}
+          />
+          Only lectures that fit the team&apos;s availability (a session where at least one member is free)
+        </label>
+
         {!result && (
-          <Button onClick={load} disabled={isLoading} variant="outline">
+          <Button onClick={() => load()} disabled={isLoading} variant="outline">
             {isLoading && <Loader2 className="animate-spin" />}
             {isLoading ? 'Finding lecturers…' : 'Find lecturers to email'}
           </Button>
@@ -78,6 +92,11 @@ export function TargetFinder() {
 
         {result && (
           <>
+            {result.onlyMatching && result.membersWithAvailability === 0 && (
+              <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                Nobody on the team has entered availability yet, so no lecture fits. Ask the team to fill in &quot;My availability&quot;.
+              </p>
+            )}
             <div className="flex flex-wrap items-center gap-3">
               <span className="text-sm font-medium">{result.candidates.length} lecturers found</span>
               {result.skipped.length > 0 && (
@@ -115,7 +134,9 @@ export function TargetFinder() {
                       {c.lectures.map(l => (
                         <li key={l.id}>
                           {l.title}
-                          {l.nextSession && <span className="text-xs"> — next: {l.nextSession}</span>}
+                          {l.match
+                            ? <span className="text-xs text-emerald-700"> — fits: {l.match.label} ({l.match.members.join(', ')}){l.matchingSessions > 1 ? `, ${l.matchingSessions - 1} more` : ''}</span>
+                            : l.nextSession && <span className="text-xs"> — next: {l.nextSession}</span>}
                         </li>
                       ))}
                     </ul>
