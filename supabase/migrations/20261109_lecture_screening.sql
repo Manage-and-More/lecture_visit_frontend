@@ -7,8 +7,9 @@
 --   service role.
 begin;
 
+-- recommended_semester already existed in production (an earlier import); keep it if present
 alter table public.lecture_study_programs
-  add column recommended_semester smallint check (recommended_semester between 1 and 20);
+  add column if not exists recommended_semester smallint check (recommended_semester between 1 and 20);
 
 alter table public.study_programs
   add column student_count integer check (student_count >= 0);
