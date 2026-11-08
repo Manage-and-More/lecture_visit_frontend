@@ -1,8 +1,9 @@
-import { amIOnTheTeam, getMyAvailability, getMyVisits } from '@/app/actions/visit-planning'
+import { amIOnTheTeam, getMyAvailability, getMyConfirmation, getMyVisits } from '@/app/actions/visit-planning'
+import { ConfirmAvailability } from '@/components/availability/confirm-availability'
 import { AvailabilityCalendar } from '@/components/availability/availability-calendar'
 
 export default async function AvailabilityPage() {
-  const [entries, visits, onTeam] = await Promise.all([getMyAvailability(), getMyVisits(), amIOnTheTeam()])
+  const [entries, visits, onTeam, confirmedAt] = await Promise.all([getMyAvailability(), getMyVisits(), amIOnTheTeam(), getMyConfirmation()])
 
   return (
     <div className="animate-fade-in-up space-y-6">
@@ -17,6 +18,7 @@ export default async function AvailabilityPage() {
           You&apos;re not on the current visit team, so visits won&apos;t be planned for you. Ask an admin to add you.
         </p>
       )}
+      <ConfirmAvailability confirmedAt={confirmedAt} hasEntries={entries.length > 0} />
       <AvailabilityCalendar entries={entries} />
       <section className="rounded-lg border bg-white p-4 text-sm space-y-2">
         <h2 className="font-medium">My upcoming visits</h2>

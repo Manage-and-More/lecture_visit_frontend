@@ -79,16 +79,14 @@ export async function getThreadMessages(outreachId: string): Promise<EmailMessag
 
 export async function previewTargets(onlyMatching: boolean): Promise<TargetResult> {
   const { supabase } = await requireAdmin()
-  const settings = await getSettings(supabase)
-  return findTargets(supabase, await activeSemester(supabase), settings, { onlyMatching })
+  return findTargets(supabase, await activeSemester(supabase), { onlyMatching })
 }
 
 /** Queues the first email for the chosen lecturers. Targets are recomputed on the server. */
 export async function queueOutreach(professorIds: string[], onlyMatching: boolean): Promise<{ queued: number }> {
   const { supabase, userId } = await requireAdmin()
-  const settings = await getSettings(supabase)
   const semester = await activeSemester(supabase)
-  const { candidates } = await findTargets(supabase, semester, settings, { onlyMatching })
+  const { candidates } = await findTargets(supabase, semester, { onlyMatching })
   const chosen = candidates.filter(c => professorIds.includes(c.professorId))
 
   let queued = 0

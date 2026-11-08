@@ -78,7 +78,7 @@ export function WeekGrid({ weekStart, sessions, visits, members, memberNames, on
     date.setDate(date.getDate() + i)
     const counts: number[] = []
     for (let m = DAY_START; m < DAY_END; m += 30) {
-      counts.push(members.filter(mem => covers(mem.slots, date, m, m + 30)).length)
+      counts.push(members.filter(mem => mem.confirmed && covers(mem.slots, date, m, m + 30)).length)
     }
     return counts
   }), [members, weekStart])
