@@ -2,25 +2,13 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import { activeSemester, requireAdmin } from '@/lib/auth'
 import { findTargets, type TargetResult } from '@/lib/outreach/targets'
 import { aiReadingEnabled, getSettings, renderTemplated } from '@/lib/outreach/engine'
 import type {
   EmailMessage, MailSettings, OutreachThreadStatus, ProfessorOutreach,
 } from '@/types/database'
 
-async function requireAdmin() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) throw new Error('Not signed in')
-  const { data: profile } = await supabase.from('profiles').select('is_admin').eq('id', user.id).single()
-  if (!profile?.is_admin) throw new Error('Only admins can manage outreach')
-  return { supabase, userId: user.id }
-}
-
-async function activeSemester(supabase: Awaited<ReturnType<typeof createClient>>): Promise<string> {
-  const { data } = await supabase.from('parameters').select('value').eq('key', 'active_semester').single()
-  return data?.value ?? 'WiSe 2026/27'
-}
 
 export type OutreachThread = ProfessorOutreach & {
   professor: { first_name: string | null; last_name: string | null; title: string | null } | null
