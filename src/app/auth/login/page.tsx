@@ -50,7 +50,7 @@ export default function LoginPage() {
         setErrorMessage('Invalid email or password.')
       }
     } else {
-      router.push('/outreach')
+      router.push('/home')
       router.refresh()
     }
   }

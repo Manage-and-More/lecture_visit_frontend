@@ -6,7 +6,7 @@ export async function GET(request: NextRequest) {
   const code = searchParams.get('code')
   const token_hash = searchParams.get('token_hash')
   const type = searchParams.get('type')
-  const next = searchParams.get('next') ?? '/outreach'
+  const next = searchParams.get('next') ?? '/home'
   // Password resets and invitations both end on the page where the user sets a password
   const destination = type === 'recovery' || type === 'invite' ? '/auth/reset-password' : next
 
