@@ -1,7 +1,18 @@
 import { getOutreachOverview } from '@/app/actions/outreach'
 import { OutreachDashboard } from '@/components/outreach/outreach-dashboard'
+import { OUTREACH_ENABLED } from '@/lib/features'
 
 export default async function OutreachPage() {
+  if (!OUTREACH_ENABLED) {
+    return (
+      <div className="animate-fade-in-up">
+        <h1 className="text-2xl font-semibold tracking-tight">Outreach</h1>
+        <p className="mt-4 rounded-lg border bg-white p-6 text-sm text-muted-foreground">
+          Outreach is paused for now. Use Lectures, Calendar and My availability in the meantime.
+        </p>
+      </div>
+    )
+  }
   const overview = await getOutreachOverview()
 
   return (

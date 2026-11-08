@@ -2,13 +2,14 @@ import Link from 'next/link'
 import { CheckCircle2, CircleDashed } from 'lucide-react'
 import { getTeamStatus } from '@/app/actions/visit-planning'
 import { cn } from '@/lib/utils'
+import { OUTREACH_ENABLED } from '@/lib/features'
 
 // The order is the workflow
 const STEPS = [
-  { title: 'Screen relevant lectures', href: '/lectures' },
-  { title: 'Enter your availability', href: '/availability' },
-  { title: 'Match lectures to free times', href: '/outreach' },
-  { title: 'Run the outreach', href: '/outreach' },
+  { title: 'Screen relevant lectures', href: '/lectures', disabled: false },
+  { title: 'Enter your availability', href: '/availability', disabled: false },
+  { title: 'Match lectures to free times', href: '/calendar', disabled: false },
+  { title: 'Run the outreach', href: '/outreach', disabled: !OUTREACH_ENABLED },
 ]
 
 /** First page after signing in: the workflow in four steps, and who has committed their availability. */
@@ -26,12 +27,23 @@ export default async function HomePage() {
       <ol className="grid gap-2 sm:grid-cols-2">
         {STEPS.map((step, index) => (
           <li key={step.title}>
-            <Link href={step.href} className="flex items-center gap-3 rounded-lg border bg-white px-4 py-3 text-sm font-medium hover:bg-black/[0.02]">
-              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-foreground text-xs font-semibold text-background tabular-nums">
-                {index + 1}
+            {step.disabled ? (
+              <span aria-disabled="true" title="Temporarily disabled"
+                className="flex cursor-not-allowed items-center gap-3 rounded-lg border bg-white/60 px-4 py-3 text-sm font-medium text-muted-foreground/60">
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted-foreground/30 text-xs font-semibold text-background tabular-nums">
+                  {index + 1}
+                </span>
+                {step.title}
+                <span className="ml-auto text-xs font-normal">Later</span>
               </span>
-              {step.title}
-            </Link>
+            ) : (
+              <Link href={step.href} className="flex items-center gap-3 rounded-lg border bg-white px-4 py-3 text-sm font-medium hover:bg-black/[0.02]">
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-foreground text-xs font-semibold text-background tabular-nums">
+                  {index + 1}
+                </span>
+                {step.title}
+              </Link>
+            )}
           </li>
         ))}
       </ol>

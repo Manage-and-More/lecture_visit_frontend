@@ -4,8 +4,11 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Settings, Mail, CalendarDays, Clock, House, ListFilter } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { OUTREACH_ENABLED } from '@/lib/features'
 
-const navItems = [
+type NavItem = { title: string; href: string; icon: typeof House; disabled?: boolean }
+
+const navItems: NavItem[] = [
   {
     title: 'Home',
     href: '/home',
@@ -19,7 +22,8 @@ const navItems = [
   {
     title: 'Outreach',
     href: '/outreach',
-    icon: Mail
+    icon: Mail,
+    disabled: !OUTREACH_ENABLED
   },
   {
     title: 'Calendar',
@@ -46,7 +50,21 @@ export function SidebarNav() {
       {navItems.map((item) => {
         // We consider it active if the path starts with the href, so /programs/1 is still active
         const isActive = pathname.startsWith(item.href)
-        
+
+        if (item.disabled) {
+          return (
+            <span
+              key={item.href}
+              aria-disabled="true"
+              title="Temporarily disabled"
+              className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-muted-foreground/50 cursor-not-allowed select-none"
+            >
+              <item.icon className="h-4 w-4" />
+              {item.title}
+            </span>
+          )
+        }
+
         return (
           <Link
             key={item.href}
