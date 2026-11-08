@@ -50,9 +50,11 @@ export async function proxy(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  // Allow public routes (auth pages, landing page)
+  // Allow public routes (auth pages, landing page). The mail bridge API checks its own
+  // Google identity token instead of a login session.
   const isPublicRoute =
     request.nextUrl.pathname.startsWith('/auth') ||
+    request.nextUrl.pathname.startsWith('/api/mail/') ||
     request.nextUrl.pathname === '/'
 
   // Redirect unauthenticated users to login

@@ -93,13 +93,13 @@ export function parseIntervalWeeks(frequency: string | null): number {
 
 export const WEEKS_PER_PAGE = 2
 
-export function extrapolateDates(schedules: LectureSchedule[], weeksOffset: number): ExtrapolatedDate[] {
+export function extrapolateDates(schedules: LectureSchedule[], weeksOffset: number, weeks: number = WEEKS_PER_PAGE): ExtrapolatedDate[] {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   const pageStart = new Date(today)
   pageStart.setDate(pageStart.getDate() + weeksOffset * 7)
   const pageEnd = new Date(pageStart)
-  pageEnd.setDate(pageEnd.getDate() + WEEKS_PER_PAGE * 7)
+  pageEnd.setDate(pageEnd.getDate() + weeks * 7)
 
   const results: ExtrapolatedDate[] = []
 
