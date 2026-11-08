@@ -2,10 +2,15 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Settings, Mail, CalendarDays, Clock, BookOpen } from 'lucide-react'
+import { Settings, Mail, CalendarDays, Clock, House } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const navItems = [
+  {
+    title: 'Home',
+    href: '/home',
+    icon: House
+  },
   {
     title: 'Outreach',
     href: '/outreach',
@@ -22,11 +27,6 @@ const navItems = [
     icon: Clock
   },
   {
-    title: 'How it works',
-    href: '/',
-    icon: BookOpen
-  },
-  {
     title: 'Settings',
     href: '/settings',
     icon: Settings
@@ -40,7 +40,7 @@ export function SidebarNav() {
     <nav className="flex-1 px-3 py-2 space-y-0.5">
       {navItems.map((item) => {
         // We consider it active if the path starts with the href, so /programs/1 is still active
-        const isActive = item.href === '/' ? pathname === '/' : pathname.startsWith(item.href)
+        const isActive = pathname.startsWith(item.href)
         
         return (
           <Link
