@@ -36,7 +36,7 @@ export function OutreachDashboard({ overview, settings }: Props) {
 
   return (
     <div className="space-y-6">
-      <MailControls settings={settings} sentLastDay={overview.sentLastDay} queuedCount={overview.queuedCount} bridgeHealthy={overview.bridgeHealthy} />
+      <MailControls settings={settings} sentLastDay={overview.sentLastDay} queuedCount={overview.queuedCount} bridgeHealthy={overview.bridgeHealthy} unreadReplies={overview.unreadReplies} aiReading={overview.aiReading} />
 
       <Card>
         <CardHeader>

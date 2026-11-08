@@ -10,6 +10,12 @@ type Db = SupabaseClient
 /** Statuses whose Gmail threads the bridge keeps watching for replies. */
 const WATCHED_STATUSES = ['awaiting_reply', 'interested', 'needs_attention', 'scheduled', 'declined']
 const LEASE_TIMEOUT_MINUTES = 30
+export const NEW_REPLY_REASON = 'New reply, not read yet'
+
+/** Replies are read by the Claude API only when a key is configured; otherwise in a Claude Code session. */
+export function aiReadingEnabled(): boolean {
+  return Boolean(process.env.ANTHROPIC_API_KEY)
+}
 
 export type OutboxItem = {
   id: string
@@ -281,9 +287,13 @@ export async function storeInbound(db: Db, items: InboundItem[]): Promise<number
         .update({ status: 'failed', attention_reason: 'The email bounced: the address may be wrong or no longer in use.', updated_at: new Date().toISOString() })
         .eq('id', outreachId)
     } else {
-      await db.from('professor_outreach')
-        .update({ last_inbound_at: receivedAt, updated_at: new Date().toISOString() })
-        .eq('id', outreachId)
+      const update: Partial<ProfessorOutreach> = { last_inbound_at: receivedAt, updated_at: new Date().toISOString() }
+      // Without an API key nothing reads replies automatically: show them to a person right away
+      if (!aiReadingEnabled()) {
+        update.status = 'needs_attention'
+        update.attention_reason = NEW_REPLY_REASON
+      }
+      await db.from('professor_outreach').update(update).eq('id', outreachId)
     }
   }
   return stored
@@ -312,8 +322,9 @@ async function queueTemplatedReply(
   })
 }
 
-async function applyClassification(
+export async function applyClassification(
   db: Db, settings: MailSettings, inbound: EmailMessage, c: ReplyClassification,
+  options: { skipAutoReply?: boolean } = {},
 ): Promise<void> {
   const ctx = await loadContext(db, inbound.outreach_id)
   const now = new Date().toISOString()
@@ -345,13 +356,20 @@ async function applyClassification(
     update.attention_reason = null
   } else if (c.category === 'out_of_office') {
     // Not a decision: keep waiting, the follow-up timer still applies
+    if (ctx.outreach.status === 'needs_attention' && ctx.outreach.attention_reason === NEW_REPLY_REASON) {
+      update.status = 'awaiting_reply'
+      update.attention_reason = null
+    }
   } else if ((c.category === 'yes' || c.category === 'no') && !reviewFirst) {
     const anyYes = c.category === 'yes' || c.lecture_decisions.some(d => d.decision === 'yes')
     await setResponses(c.category)
     if (ctx.outreach.status !== 'scheduled') update.status = anyYes ? 'interested' : 'declined'
     update.attention_reason = null
-    if (anyYes && settings.auto_ack_yes) await queueTemplatedReply(db, settings, ctx, 'ack_yes', inbound)
-    if (!anyYes && settings.auto_ack_no) await queueTemplatedReply(db, settings, ctx, 'ack_no', inbound)
+    // A reply written for this email replaces the automatic thank-you
+    if (!options.skipAutoReply) {
+      if (anyYes && settings.auto_ack_yes) await queueTemplatedReply(db, settings, ctx, 'ack_yes', inbound)
+      if (!anyYes && settings.auto_ack_no) await queueTemplatedReply(db, settings, ctx, 'ack_no', inbound)
+    }
   } else {
     update.status = 'needs_attention'
     update.attention_reason = c.reason_for_human ?? `Reply classified as "${c.category}" (${c.confidence} confidence)`
@@ -362,6 +380,7 @@ async function applyClassification(
 
 /** Classifies new replies until the time budget runs out; the rest wait for the next run. */
 export async function processInbound(db: Db, settings: MailSettings, budgetMs: number): Promise<number> {
+  if (!aiReadingEnabled()) return 0
   const started = Date.now()
   const { data: pending } = await db.from('email_messages')
     .select('*')
@@ -447,4 +466,26 @@ export async function queueFollowups(db: Db, settings: MailSettings): Promise<nu
     queued++
   }
   return queued
+}
+
+/** Queues an answer to an inbound email, sent inside the lecturer's Gmail thread. */
+export async function queueReplyTo(
+  db: Db, inbound: EmailMessage, body: string, createdBy: string | null = null,
+): Promise<void> {
+  const { data: outreach } = await db.from('professor_outreach')
+    .select('to_email').eq('id', inbound.outreach_id).single()
+  const subject = inbound.subject.toLowerCase().startsWith('re:') ? inbound.subject : `Re: ${inbound.subject}`
+  const { error } = await db.from('email_messages').insert({
+    outreach_id: inbound.outreach_id,
+    direction: 'outbound',
+    kind: 'manual',
+    status: 'queued',
+    to_emails: [addressOf(inbound.from_email ?? outreach?.to_email ?? '')],
+    subject,
+    body: body.trim(),
+    reply_to_gmail_message_id: inbound.gmail_message_id,
+    queued_at: new Date().toISOString(),
+    created_by: createdBy,
+  })
+  if (error) throw error
 }

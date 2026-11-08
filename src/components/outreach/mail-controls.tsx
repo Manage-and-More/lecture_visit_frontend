@@ -22,9 +22,11 @@ type Props = {
   sentLastDay: number
   queuedCount: number
   bridgeHealthy: boolean
+  unreadReplies: number
+  aiReading: boolean
 }
 
-export function MailControls({ settings, sentLastDay, queuedCount, bridgeHealthy }: Props) {
+export function MailControls({ settings, sentLastDay, queuedCount, bridgeHealthy, unreadReplies, aiReading }: Props) {
   const { toast } = useToast()
   const [isPending, startTransition] = useTransition()
   const [confirmLive, setConfirmLive] = useState(false)
@@ -118,6 +120,15 @@ export function MailControls({ settings, sentLastDay, queuedCount, bridgeHealthy
             </dd>
           </div>
         </dl>
+
+        {unreadReplies > 0 && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+            {unreadReplies} {unreadReplies === 1 ? 'reply is' : 'replies are'} waiting to be read.{' '}
+            {aiReading
+              ? 'The AI reads them with the next check-in.'
+              : <>Say &quot;process the outreach inbox&quot; in Claude Code, or open the threads marked &quot;Needs attention&quot; and decide by hand.</>}
+          </div>
+        )}
 
         {settings.last_bridge_error && (
           <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800 whitespace-pre-wrap">

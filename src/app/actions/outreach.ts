@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { findTargets, type TargetResult } from '@/lib/outreach/targets'
-import { getSettings, renderTemplated } from '@/lib/outreach/engine'
+import { aiReadingEnabled, getSettings, renderTemplated } from '@/lib/outreach/engine'
 import type {
   EmailMessage, MailSettings, OutreachThreadStatus, ProfessorOutreach,
 } from '@/types/database'
@@ -35,6 +35,9 @@ export type OutreachOverview = {
   queuedCount: number
   /** The Gmail script checked in within the last 15 minutes */
   bridgeHealthy: boolean
+  /** Replies nobody has read yet (in a Claude Code session or by hand) */
+  unreadReplies: number
+  aiReading: boolean
   threads: OutreachThread[]
 }
 
@@ -46,12 +49,12 @@ export async function getOutreachOverview(): Promise<OutreachOverview> {
     : { data: null }
   const semester = await activeSemester(supabase)
   if (!profile?.is_admin) {
-    return { isAdmin: false, semester, settings: null, sentLastDay: 0, queuedCount: 0, bridgeHealthy: false, threads: [] }
+    return { isAdmin: false, semester, settings: null, sentLastDay: 0, queuedCount: 0, bridgeHealthy: false, unreadReplies: 0, aiReading: false, threads: [] }
   }
 
   const settings = await getSettings(supabase)
   const dayAgo = new Date(Date.now() - 24 * 3600_000).toISOString()
-  const [{ count: sentLastDay }, { count: queuedCount }, { data: threads }] = await Promise.all([
+  const [{ count: sentLastDay }, { count: queuedCount }, { data: threads }, { count: unreadReplies }] = await Promise.all([
     supabase.from('email_messages').select('id', { count: 'exact', head: true })
       .eq('direction', 'outbound').in('status', ['sent', 'sending']).gte('lease_at', dayAgo),
     supabase.from('email_messages').select('id', { count: 'exact', head: true })
@@ -61,6 +64,8 @@ export async function getOutreachOverview(): Promise<OutreachOverview> {
       .eq('semester', semester)
       .order('updated_at', { ascending: false })
       .limit(1000),
+    supabase.from('email_messages').select('id', { count: 'exact', head: true })
+      .eq('direction', 'inbound').eq('kind', 'reply').is('classified_at', null),
   ])
 
   return {
@@ -69,6 +74,8 @@ export async function getOutreachOverview(): Promise<OutreachOverview> {
     settings,
     sentLastDay: sentLastDay ?? 0,
     queuedCount: queuedCount ?? 0,
+    unreadReplies: unreadReplies ?? 0,
+    aiReading: aiReadingEnabled(),
     bridgeHealthy: !!settings.last_bridge_at && Date.now() - new Date(settings.last_bridge_at).getTime() < 15 * 60_000,
     threads: (threads ?? []) as unknown as OutreachThread[],
   }
@@ -158,6 +165,10 @@ export async function setThreadStatus(outreachId: string, status: OutreachThread
     .update({ status, attention_reason: null, updated_at: new Date().toISOString() })
     .eq('id', outreachId)
   if (error) throw error
+  // A person decided: replies that were waiting to be read count as handled
+  await supabase.from('email_messages')
+    .update({ classified_at: new Date().toISOString(), processing_error: null })
+    .eq('outreach_id', outreachId).eq('direction', 'inbound').is('classified_at', null)
   if (status === 'cancelled' || status === 'do_not_contact') {
     await supabase.from('email_messages').update({ status: 'cancelled' })
       .eq('outreach_id', outreachId).eq('status', 'queued')
