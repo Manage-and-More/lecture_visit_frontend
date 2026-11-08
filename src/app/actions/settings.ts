@@ -90,5 +90,4 @@ export async function updateActiveSemester(semester: string): Promise<void> {
 
   if (error) throw error
   revalidatePath('/settings')
-  revalidatePath('/campaigns')
 }
