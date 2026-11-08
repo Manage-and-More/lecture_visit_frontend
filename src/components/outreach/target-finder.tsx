@@ -65,8 +65,8 @@ export function TargetFinder() {
       <CardHeader>
         <CardTitle>Add lecturers</CardTitle>
         <CardDescription>
-          Finds mandatory lectures of starred study programs, plus starred lectures, that still have sessions left and a lecturer
-          with a known email. Each lecturer gets one email covering all their lectures.
+          Takes the target lectures chosen on the Lectures page that still have sessions left and a lecturer with a known email.
+          Each lecturer gets one email covering all their lectures.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -80,7 +80,7 @@ export function TargetFinder() {
               if (result) load(e.target.checked)
             }}
           />
-          Only lectures that fit the team&apos;s availability (a session where at least one member is free)
+          Only lectures that fit the team&apos;s confirmed availability (a session where at least one member is free)
         </label>
 
         {!result && (
@@ -92,9 +92,14 @@ export function TargetFinder() {
 
         {result && (
           <>
-            {result.onlyMatching && result.membersWithAvailability === 0 && (
+            {result.targetCount === 0 && (
               <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-                Nobody on the team has entered availability yet, so no lecture fits. Ask the team to fill in &quot;My availability&quot;.
+                No target lectures yet. Choose them on the <a href="/lectures" className="underline">Lectures</a> page.
+              </p>
+            )}
+            {result.targetCount > 0 && result.onlyMatching && result.membersWithAvailability === 0 && (
+              <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                Nobody on the team has confirmed their availability yet, so no lecture fits. The home page shows who still has to.
               </p>
             )}
             <div className="flex flex-wrap items-center gap-3">

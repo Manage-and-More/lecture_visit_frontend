@@ -67,7 +67,7 @@ export function VisitCalendar() {
   useEffect(() => { reload() }, [reload])
 
   const memberNames = useMemo(() => new Map((week?.members ?? []).map(m => [m.id, m.name])), [week])
-  const membersWithAvailability = (week?.members ?? []).filter(m => m.slots.length > 0).length
+  const membersWithAvailability = (week?.members ?? []).filter(m => m.confirmed && m.slots.length > 0).length
 
   const shiftWeek = (weeks: number) => {
     const d = fromDateKey(weekKey)
@@ -113,7 +113,7 @@ export function VisitCalendar() {
         <CardContent className="space-y-3 text-sm">
           <p className="text-muted-foreground">
             For every lecture whose lecturer said yes, picks the earliest session in the coming weeks where two members
-            (or at least one) are free, spreading visits evenly. {membersWithAvailability} {membersWithAvailability === 1 ? 'member has' : 'members have'} entered availability.
+            (or at least one) are free, spreading visits evenly. {membersWithAvailability} {membersWithAvailability === 1 ? 'member has' : 'members have'} confirmed their availability.
           </p>
           <div className="flex flex-wrap items-center gap-2">
             <label htmlFor="weeks-ahead" className="text-sm">Look ahead</label>

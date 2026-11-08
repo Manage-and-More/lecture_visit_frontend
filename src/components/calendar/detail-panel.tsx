@@ -28,6 +28,7 @@ type Props = {
 function freeMembers(members: CalendarMember[], visits: CalendarVisit[], startMinutes: number, startIso: string, ignoreVisitId?: string) {
   const start = new Date(startIso).getTime()
   return members.filter(m =>
+    m.confirmed &&
     covers(m.slots, new Date(startIso), startMinutes, startMinutes + 30) &&
     !visits.some(v => v.id !== ignoreVisitId && v.assigneeIds.includes(m.id) &&
       Math.abs(new Date(v.start).getTime() - start) < MIN_GAP_MINUTES * 60_000))
@@ -46,6 +47,7 @@ function MemberPicker({ members, free, selected, onToggle }: {
           <span className={cn(!free.has(m.id) && 'text-muted-foreground')}>{m.name}</span>
           <span className="ml-auto text-xs">
             {free.has(m.id) ? <span className="text-emerald-700">free</span>
+              : !m.confirmed ? <span className="text-muted-foreground">availability not confirmed</span>
               : m.slots.length ? <span className="text-muted-foreground">not free</span>
               : <span className="text-muted-foreground">no availability entered</span>}
           </span>

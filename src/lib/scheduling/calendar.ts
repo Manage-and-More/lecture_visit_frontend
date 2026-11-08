@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { sessionsInRange } from '@/lib/date-utils'
 import type {
-  LectureSchedule, MailSettings, OutreachThreadStatus, ReplyClassification, Visit, VisitStatus,
+  LectureSchedule, OutreachThreadStatus, ReplyClassification, Visit, VisitStatus,
 } from '@/types/database'
 import { isoWeekday, toMinutes, type Slot } from './time'
 
@@ -43,7 +43,8 @@ export type CalendarVisit = {
   notes: string | null
 }
 
-export type CalendarMember = { id: string; name: string; slots: Slot[] }
+/** A team member; only confirmed (committed) availability counts for matching and scheduling. */
+export type CalendarMember = { id: string; name: string; slots: Slot[]; confirmed: boolean }
 
 export type CalendarWeek = {
   semester: string
@@ -92,18 +93,10 @@ async function scopeLectureIds(
     return [...new Set(rows.map(r => r.lecture_id))]
   }
   if (scope === 'targets') {
-    const { data: programs } = await db.from('study_programs').select('id').eq('is_starred', true)
-    const ids = new Set<string>()
-    for (const programIds of chunks((programs ?? []).map(p => p.id as string))) {
-      const links = await fetchAll<{ lecture_id: string }>((from, to) =>
-        db.from('lecture_study_programs').select('lecture_id')
-          .in('study_program_id', programIds).eq('lecture_obligation', 'mandatory').range(from, to))
-      links.forEach(l => ids.add(l.lecture_id))
-    }
-    const starred = await fetchAll<{ id: string }>((from, to) =>
-      db.from('lectures').select('id').eq('semester', semester).eq('is_starred', true).range(from, to))
-    starred.forEach(l => ids.add(l.id))
-    return [...ids]
+    // The shared target list from the Lectures page (filtered to the semester below)
+    const rows = await fetchAll<{ lecture_id: string }>((from, to) =>
+      db.from('target_lectures').select('lecture_id').range(from, to))
+    return rows.map(r => r.lecture_id)
   }
   const q = search.trim()
   if (q.length < 2) return []
@@ -114,9 +107,9 @@ async function scopeLectureIds(
 
 export async function loadCalendarWeek(
   db: Db,
-  options: { semester: string; weekStart: Date; scope: CalendarScope; university: string; search: string; settings: MailSettings },
+  options: { semester: string; weekStart: Date; scope: CalendarScope; university: string; search: string },
 ): Promise<CalendarWeek> {
-  const { semester, weekStart, scope, university, search, settings } = options
+  const { semester, weekStart, scope, university, search } = options
   const weekEnd = new Date(weekStart)
   weekEnd.setDate(weekEnd.getDate() + 6)
 
@@ -175,12 +168,8 @@ export async function loadCalendarWeek(
     }
   }
 
-  // Scope "targets" follows the outreach lecture-type setting; the other scopes show everything
-  const typeFilter = scope === 'targets' ? settings.lecture_type_filter.trim().toLowerCase() : ''
-
   const sessions: CalendarSession[] = []
   for (const lecture of lectures) {
-    if (typeFilter && !(lecture.lecture_type ?? '').toLowerCase().includes(typeFilter)) continue
     const outreach = outreachByLecture.get(lecture.id)
     const lecturers = lecture.lecture_professors
       .map(lp => lp.professor).filter(Boolean)
@@ -262,11 +251,16 @@ export async function loadMembers(db: Db): Promise<CalendarMember[]> {
     })
     byProfile.set(s.profile_id as string, list)
   }
+  const { data: confirmations } = profileIds.length
+    ? await db.from('availability_confirmations').select('profile_id').in('profile_id', profileIds)
+    : { data: [] }
+  const confirmed = new Set((confirmations ?? []).map(c => c.profile_id as string))
   return (profiles ?? [])
     .map(p => ({
       id: p.id as string,
       name: teamNames.get((p.email as string).toLowerCase()) ?? (p.email as string),
       slots: byProfile.get(p.id as string) ?? [],
+      confirmed: confirmed.has(p.id as string),
     }))
     .sort((a, b) => a.name.localeCompare(b.name, 'de'))
 }

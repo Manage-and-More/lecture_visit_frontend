@@ -2,7 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { extrapolateDates } from '@/lib/date-utils'
 import { loadMembers } from '@/lib/scheduling/calendar'
 import { covers, toMinutes } from '@/lib/scheduling/time'
-import type { LectureSchedule, MailSettings } from '@/types/database'
+import type { LectureSchedule } from '@/types/database'
 
 type Db = SupabaseClient
 
@@ -39,8 +39,10 @@ export type TargetResult = {
   semester: string
   candidates: TargetCandidate[]
   skipped: { reason: string; count: number }[]
-  /** Team members who entered any availability */
+  /** Team members who confirmed their availability */
   membersWithAvailability: number
+  /** Target lectures of this semester on the shared list */
+  targetCount: number
   onlyMatching: boolean
 }
 
@@ -69,30 +71,22 @@ function displayName(p: ProfessorRow): string {
 }
 
 /**
- * Lectures to ask about this semester: mandatory lectures of starred study programs plus
- * starred lectures, of the configured type, with at least one session left. One candidate per
- * lecturer, who gets one email covering all their target lectures.
+ * Lecturers to email this semester: the target lectures chosen on the Lectures page (the
+ * shared list) that still have sessions left and, if asked, a session where a team member
+ * with confirmed availability is free. One candidate per lecturer, who gets one email
+ * covering all their target lectures.
  */
 export async function findTargets(
-  db: Db, semester: string, settings: MailSettings, options: { onlyMatching: boolean } = { onlyMatching: true },
+  db: Db, semester: string, options: { onlyMatching: boolean } = { onlyMatching: true },
 ): Promise<TargetResult> {
   const skipped = new Map<string, number>()
-  const members = (await loadMembers(db)).filter(m => m.slots.length > 0)
+  // Only committed availability counts
+  const members = (await loadMembers(db)).filter(m => m.confirmed && m.slots.length > 0)
   const skip = (reason: string, n = 1) => skipped.set(reason, (skipped.get(reason) ?? 0) + n)
 
-  const { data: programs } = await db.from('study_programs').select('id').eq('is_starred', true)
-  const programIds = (programs ?? []).map(p => p.id as string)
-
-  const lectureIds = new Set<string>()
-  for (const ids of chunks(programIds)) {
-    const links = await fetchAll<{ lecture_id: string }>((from, to) =>
-      db.from('lecture_study_programs').select('lecture_id')
-        .in('study_program_id', ids).eq('lecture_obligation', 'mandatory').range(from, to))
-    links.forEach(l => lectureIds.add(l.lecture_id))
-  }
-  const starred = await fetchAll<{ id: string }>((from, to) =>
-    db.from('lectures').select('id').eq('semester', semester).eq('is_starred', true).range(from, to))
-  starred.forEach(l => lectureIds.add(l.id))
+  const targets = await fetchAll<{ lecture_id: string }>((from, to) =>
+    db.from('target_lectures').select('lecture_id').range(from, to))
+  const lectureIds = new Set(targets.map(t => t.lecture_id))
 
   type LectureRow = {
     id: string
@@ -116,17 +110,11 @@ export async function findTargets(
     .select('professor_id').eq('semester', semester).neq('status', 'cancelled')
   const alreadyContacted = new Set((existingRows ?? []).map(r => r.professor_id as string))
 
-  const typeFilter = settings.lecture_type_filter.trim().toLowerCase()
   const soon = new Date()
   soon.setDate(soon.getDate() + 2)
 
   const byProfessor = new Map<string, TargetCandidate>()
   for (const lecture of lectures) {
-    if (typeFilter && !(lecture.lecture_type ?? '').toLowerCase().includes(typeFilter)) {
-      skip(`Lecture type isn't "${settings.lecture_type_filter}"`)
-      continue
-    }
-
     const upcoming = extrapolateDates(lecture.schedules, 0, 20).filter(d => d.date >= soon)
     const hasSchedule = lecture.schedules.some(s => s.day_time)
     if (hasSchedule && upcoming.length === 0) {
@@ -204,6 +192,7 @@ export async function findTargets(
     candidates,
     skipped: [...skipped.entries()].map(([reason, count]) => ({ reason, count })).sort((a, b) => b.count - a.count),
     membersWithAvailability: members.length,
+    targetCount: lectures.length,
     onlyMatching: options.onlyMatching,
   }
 }

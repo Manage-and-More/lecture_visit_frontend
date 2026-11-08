@@ -33,7 +33,6 @@ export function MailControls({ settings, sentLastDay, queuedCount, bridgeHealthy
   const [dailyCap, setDailyCap] = useState(String(settings.daily_cap))
   const [followupDays, setFollowupDays] = useState(String(settings.followup_after_days))
   const [maxFollowups, setMaxFollowups] = useState(String(settings.max_followups))
-  const [typeFilter, setTypeFilter] = useState(settings.lecture_type_filter)
 
   const save = (changes: Partial<MailSettings>, message: string) => {
     startTransition(async () => {
@@ -136,7 +135,7 @@ export function MailControls({ settings, sentLastDay, queuedCount, bridgeHealthy
           </div>
         )}
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 items-end">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 items-end">
           <div className="space-y-1">
             <Label htmlFor="daily-cap">Emails per 24 h</Label>
             <Input id="daily-cap" type="number" min={0} max={1000} value={dailyCap} onChange={e => setDailyCap(e.target.value)} />
@@ -149,10 +148,6 @@ export function MailControls({ settings, sentLastDay, queuedCount, bridgeHealthy
             <Label htmlFor="max-followups">Reminders per lecturer</Label>
             <Input id="max-followups" type="number" min={0} max={3} value={maxFollowups} onChange={e => setMaxFollowups(e.target.value)} />
           </div>
-          <div className="space-y-1">
-            <Label htmlFor="type-filter">Lecture type contains</Label>
-            <Input id="type-filter" value={typeFilter} onChange={e => setTypeFilter(e.target.value)} />
-          </div>
         </div>
         <div className="flex flex-wrap items-center gap-4">
           <Button
@@ -163,7 +158,6 @@ export function MailControls({ settings, sentLastDay, queuedCount, bridgeHealthy
               daily_cap: Number(dailyCap),
               followup_after_days: Number(followupDays),
               max_followups: Number(maxFollowups),
-              lecture_type_filter: typeFilter,
             }, 'Limits saved')}
           >
             Save limits

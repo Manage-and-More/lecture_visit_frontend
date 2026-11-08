@@ -54,7 +54,8 @@ export async function proposeVisits(
     }
   }
 
-  const members: CalendarMember[] = (await loadMembers(db)).filter(m => m.slots.length > 0)
+  // Only committed availability counts
+  const members: CalendarMember[] = (await loadMembers(db)).filter(m => m.confirmed && m.slots.length > 0)
   const from = new Date()
   from.setDate(from.getDate() + 2) // give the lecturer notice
   const to = new Date(from)
@@ -82,7 +83,7 @@ export async function proposeVisits(
       continue
     }
     if (members.length === 0) {
-      result.unscheduled.push({ title, reason: 'Nobody has entered availability yet' })
+      result.unscheduled.push({ title, reason: 'Nobody has confirmed their availability yet' })
       continue
     }
 

@@ -21,7 +21,6 @@ export async function getCalendarWeek(options: {
     scope: options.scope,
     university: options.university,
     search: options.search,
-    settings: await getSettings(supabase),
   })
 }
 
@@ -149,14 +148,78 @@ export async function saveAvailabilityEntry(entry: Omit<AvailabilityEntry, 'id'>
     ? await supabase.from('member_availability').update(row).eq('id', entry.id).eq('profile_id', userId)
     : await supabase.from('member_availability').insert(row)
   if (error) throw error
+  await clearConfirmation(supabase, userId)
   revalidatePath('/availability')
+}
+
+type SessionClient = Awaited<ReturnType<typeof requireUser>>['supabase']
+
+/** A change to the entries means the member has to confirm again. */
+async function clearConfirmation(supabase: SessionClient, userId: string) {
+  await supabase.from('availability_confirmations').delete().eq('profile_id', userId)
+  revalidatePath('/home')
 }
 
 export async function deleteAvailabilityEntry(id: string): Promise<void> {
   const { supabase, userId } = await requireUser()
   const { error } = await supabase.from('member_availability').delete().eq('id', id).eq('profile_id', userId)
   if (error) throw error
+  await clearConfirmation(supabase, userId)
   revalidatePath('/availability')
+}
+
+/** When the signed-in member last committed their availability, or null if not (since the last change). */
+export async function getMyConfirmation(): Promise<string | null> {
+  const { supabase, userId } = await requireUser()
+  const { data } = await supabase.from('availability_confirmations').select('confirmed_at').eq('profile_id', userId).maybeSingle()
+  return (data?.confirmed_at as string | undefined) ?? null
+}
+
+/** Commits the member's current availability: from now on it counts for matching and scheduling. */
+export async function confirmMyAvailability(): Promise<void> {
+  const { supabase, userId } = await requireUser()
+  const { count } = await supabase.from('member_availability').select('id', { count: 'exact', head: true }).eq('profile_id', userId)
+  if (!count) throw new Error('Add at least one time you are free before confirming')
+  const { error } = await supabase.from('availability_confirmations')
+    .upsert({ profile_id: userId, confirmed_at: new Date().toISOString() }, { onConflict: 'profile_id' })
+  if (error) throw error
+  revalidatePath('/availability')
+  revalidatePath('/home')
+}
+
+export type TeamStatus = {
+  name: string
+  status: 'confirmed' | 'not_confirmed' | 'no_account'
+  confirmedAt: string | null
+  entries: number
+}
+
+/** The visit team and whether each member has committed their availability (shown on Home). */
+export async function getTeamStatus(): Promise<TeamStatus[]> {
+  const { supabase } = await requireUser()
+  const { data: team } = await supabase.from('team_members').select('email, name').order('name')
+  const emails = (team ?? []).map(t => (t.email as string).toLowerCase())
+  if (emails.length === 0) return []
+  const { data: profiles } = await supabase.from('profiles').select('id, email').in('email', emails)
+  const idByEmail = new Map((profiles ?? []).map(p => [(p.email as string).toLowerCase(), p.id as string]))
+  const ids = [...idByEmail.values()]
+  const [{ data: confirmations }, { data: entries }] = await Promise.all([
+    ids.length ? supabase.from('availability_confirmations').select('profile_id, confirmed_at').in('profile_id', ids) : Promise.resolve({ data: [] }),
+    ids.length ? supabase.from('member_availability').select('profile_id').in('profile_id', ids) : Promise.resolve({ data: [] }),
+  ])
+  const confirmedAt = new Map((confirmations ?? []).map(c => [c.profile_id as string, c.confirmed_at as string]))
+  const entryCount = new Map<string, number>()
+  for (const e of entries ?? []) entryCount.set(e.profile_id as string, (entryCount.get(e.profile_id as string) ?? 0) + 1)
+  return (team ?? []).map(t => {
+    const id = idByEmail.get((t.email as string).toLowerCase())
+    const at = id ? confirmedAt.get(id) ?? null : null
+    return {
+      name: t.name as string,
+      status: !id ? 'no_account' : at ? 'confirmed' : 'not_confirmed',
+      confirmedAt: at,
+      entries: id ? entryCount.get(id) ?? 0 : 0,
+    }
+  })
 }
 
 export type MyVisit = { id: string; title: string; start: string; location: string | null; status: string; teammates: string[] }

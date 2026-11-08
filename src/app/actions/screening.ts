@@ -11,7 +11,7 @@ export type ScreeningFilters = {
   university: 'all' | 'TUM' | 'LMU'
   onlyVorlesung: boolean
   onlyWithEmail: boolean
-  onlyRelevant: boolean
+  onlyTargets: boolean
   page: number
 }
 
@@ -22,7 +22,7 @@ export type ScreeningRow = {
   title: string
   university: string
   lectureType: string | null
-  relevant: boolean
+  target: boolean
   score: number
   reasons: string[]
   hasEmail: boolean
@@ -36,7 +36,7 @@ export type ScreeningPage = {
   rows: ScreeningRow[]
   total: number
   pageSize: number
-  coverage: { relevantLectures: number; programsReached: number; mandatoryPrograms: number }
+  coverage: { targetLectures: number; programsReached: number; mandatoryPrograms: number }
   scored: boolean
 }
 
@@ -70,13 +70,14 @@ export async function getScreeningPage(filters: ScreeningFilters): Promise<Scree
   const { supabase } = await requireUser()
   const semester = await activeSemester(supabase)
 
-  // Coverage of the lectures marked relevant: which programs a visit there reaches
-  const { data: relevantRows } = await supabase.from('lectures')
-    .select('id, lecture_study_programs(lecture_obligation, recommended_semester, program:study_programs(id, name))')
-    .eq('semester', semester).eq('is_starred', true)
+  // The shared target list (this semester) and the programs its lectures reach
+  const { data: targetRows } = await supabase.from('target_lectures')
+    .select('lecture_id, lecture:lectures!inner(semester, lecture_study_programs(lecture_obligation, recommended_semester, program:study_programs(id, name)))')
+    .eq('lecture.semester', semester)
+  const targetIds = new Set((targetRows ?? []).map(t => t.lecture_id as string))
   const reached = new Map<string, boolean>() // program name -> reached through a mandatory lecture
-  for (const r of (relevantRows ?? []) as unknown as { lecture_study_programs: ProgramLinkRow[] }[]) {
-    for (const [name, p] of programsOf(r.lecture_study_programs)) reached.set(name, (reached.get(name) ?? false) || p.mandatory)
+  for (const t of (targetRows ?? []) as unknown as { lecture: { lecture_study_programs: ProgramLinkRow[] } }[]) {
+    for (const [name, p] of programsOf(t.lecture.lecture_study_programs)) reached.set(name, (reached.get(name) ?? false) || p.mandatory)
   }
 
   let universityId: string | null = null
@@ -86,13 +87,13 @@ export async function getScreeningPage(filters: ScreeningFilters): Promise<Scree
   }
 
   let query = supabase.from('lecture_scores')
-    .select('score, reasons, has_email, lecture:lectures!inner(id, title, lecture_type, is_starred, university_id, university:universities(name), lecture_schedules(*), lecture_study_programs(lecture_obligation, recommended_semester, program:study_programs(id, name)))', { count: 'exact' })
+    .select('score, reasons, has_email, lecture:lectures!inner(id, title, lecture_type, university_id, university:universities(name), lecture_schedules(*), lecture_study_programs(lecture_obligation, recommended_semester, program:study_programs(id, name)))', { count: 'exact' })
     .eq('semester', semester)
   if (universityId) query = query.eq('lecture.university_id', universityId)
   if (filters.search.trim()) query = query.ilike('lecture.title', `%${filters.search.trim()}%`)
   if (filters.onlyVorlesung) query = query.ilike('lecture.lecture_type', '%vorlesung%')
   if (filters.onlyWithEmail) query = query.eq('has_email', true)
-  if (filters.onlyRelevant) query = query.eq('lecture.is_starred', true)
+  if (filters.onlyTargets) query = query.in('lecture_id', targetIds.size ? [...targetIds] : ['00000000-0000-0000-0000-000000000000'])
   const from = Math.max(0, filters.page) * PAGE_SIZE
   const { data, count, error } = await query
     .order('score', { ascending: false })
@@ -105,7 +106,7 @@ export async function getScreeningPage(filters: ScreeningFilters): Promise<Scree
     reasons: string[]
     has_email: boolean
     lecture: {
-      id: string; title: string; lecture_type: string | null; is_starred: boolean | null
+      id: string; title: string; lecture_type: string | null
       university: { name: string } | null
       lecture_schedules: LectureSchedule[]
       lecture_study_programs: ProgramLinkRow[]
@@ -120,13 +121,13 @@ export async function getScreeningPage(filters: ScreeningFilters): Promise<Scree
       title: r.lecture.title,
       university: r.lecture.university?.name ?? '',
       lectureType: r.lecture.lecture_type,
-      relevant: !!r.lecture.is_starred,
+      target: targetIds.has(r.lecture.id),
       score: Number(r.score),
       reasons: r.reasons,
       hasEmail: r.has_email,
       nextSession: extrapolateDates(r.lecture.lecture_schedules, 0, 20)[0]?.label ?? null,
       programs,
-      newPrograms: r.lecture.is_starred ? 0 : programs.filter(p => !p.reached).length,
+      newPrograms: targetIds.has(r.lecture.id) ? 0 : programs.filter(p => !p.reached).length,
     }
   })
 
@@ -139,7 +140,7 @@ export async function getScreeningPage(filters: ScreeningFilters): Promise<Scree
     total: count ?? 0,
     pageSize: PAGE_SIZE,
     coverage: {
-      relevantLectures: relevantRows?.length ?? 0,
+      targetLectures: targetIds.size,
       programsReached: reached.size,
       mandatoryPrograms: [...reached.values()].filter(Boolean).length,
     },
@@ -147,10 +148,12 @@ export async function getScreeningPage(filters: ScreeningFilters): Promise<Scree
   }
 }
 
-/** Marks a lecture as relevant for outreach (or not). Relevant lectures are outreach targets. */
-export async function setLectureRelevant(lectureId: string, relevant: boolean): Promise<void> {
-  const { supabase } = await requireAdmin()
-  const { error } = await supabase.from('lectures').update({ is_starred: relevant }).eq('id', lectureId)
+/** Adds a lecture to the shared target list, or removes it. Outreach takes its lectures from this list. */
+export async function setLectureTarget(lectureId: string, target: boolean): Promise<void> {
+  const { supabase, userId } = await requireAdmin()
+  const { error } = target
+    ? await supabase.from('target_lectures').upsert({ lecture_id: lectureId, added_by: userId }, { onConflict: 'lecture_id', ignoreDuplicates: true })
+    : await supabase.from('target_lectures').delete().eq('lecture_id', lectureId)
   if (error) throw error
   revalidatePath('/lectures')
 }
