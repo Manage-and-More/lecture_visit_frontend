@@ -1,0 +1,35 @@
+# Fly.io app config. Deployed by .github/workflows/deploy.yml when `production` is updated.
+# Secrets (MAILJET_API_KEY, MAILJET_SECRET_KEY, CALENDAR_ORGANIZER_*) are set once with `fly secrets set`.
+app = "mm-lecture-visit"
+primary_region = "fra"
+
+[build]
+  dockerfile = "Dockerfile"
+
+  # Inlined into the client bundle at build time. Both values are public by design:
+  # the publishable key only grants what the database's RLS policies allow.
+  [build.args]
+    NEXT_PUBLIC_SUPABASE_URL = "https://wgdzikstvulyrkuozemb.supabase.co"
+    NEXT_PUBLIC_SUPABASE_ANON_KEY = "REPLACE_WITH_PUBLISHABLE_KEY"
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  # Used a few weeks per semester: sleep when idle, resume on the first request.
+  auto_stop_machines = "suspend"
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ["app"]
+
+  [[http_service.checks]]
+    grace_period = "15s"
+    interval = "30s"
+    method = "GET"
+    timeout = "5s"
+    # Static file: bypasses the auth proxy, so the check needs no Supabase round trip
+    path = "/logo.png"
+
+[[vm]]
+  memory = "1gb"
+  cpu_kind = "shared"
+  cpus = 1

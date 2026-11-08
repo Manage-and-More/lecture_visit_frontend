@@ -48,6 +48,19 @@ Open [http://localhost:3000](http://localhost:3000).
 | `npm run start` | Start production server |
 | `npm run lint` | Run ESLint |
 
+## Deployment
+
+Hosted on [Fly.io](https://fly.io) as app `mm-lecture-visit` (region `fra`): https://mm-lecture-visit.fly.dev
+
+- **Release:** open a PR from `main` into `production`. Merging it runs `.github/workflows/deploy.yml`, which builds the `Dockerfile` on Fly's builders and rolls it out. A manual `fly deploy` from a laptop does the same.
+- **Public build values** (Supabase URL and publishable key) are `[build.args]` in `fly.toml`, because Next.js inlines `NEXT_PUBLIC_*` at build time.
+- **Secrets** are set once on the Fly app, never committed:
+  ```bash
+  fly secrets set -a mm-lecture-visit MAILJET_API_KEY=… MAILJET_SECRET_KEY=… CALENDAR_ORGANIZER_EMAIL=… CALENDAR_ORGANIZER_NAME=…
+  ```
+- **GitHub:** environment `production` (deployment branch `production` only) with secret `FLY_API_TOKEN` from `fly tokens create deploy -a mm-lecture-visit`.
+- **Supabase Auth:** the Site URL and redirect URLs (Authentication → URL Configuration) must include the deployed address, or sign-in and password-reset emails point to the wrong host.
+
 ## Project Structure
 
 ```
