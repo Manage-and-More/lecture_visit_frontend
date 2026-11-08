@@ -130,3 +130,103 @@ export type Parameter = {
   key: string
   value: string | null
 }
+
+// Outreach (supabase/migrations/20261108_outreach.sql)
+export type MailMode = 'off' | 'test' | 'live'
+
+export type MailSettings = {
+  id: boolean
+  mode: MailMode
+  daily_cap: number
+  per_run_cap: number
+  followup_after_days: number
+  max_followups: number
+  auto_ack_yes: boolean
+  auto_ack_no: boolean
+  lecture_type_filter: string
+  sender_name: string
+  sender_email: string
+  subject_request: string
+  template_request: string
+  template_followup: string
+  template_ack_yes: string
+  template_ack_no: string
+  template_confirmation: string
+  last_bridge_at: string | null
+  last_bridge_error: string | null
+  bridge_audience: string | null
+  updated_at: string
+  updated_by: string | null
+}
+
+export type OutreachThreadStatus =
+  | 'queued' | 'awaiting_reply' | 'interested' | 'declined' | 'needs_attention'
+  | 'scheduled' | 'do_not_contact' | 'failed' | 'cancelled'
+
+export type ProfessorOutreach = {
+  id: string
+  professor_id: string
+  semester: SemesterType
+  status: OutreachThreadStatus
+  to_email: string
+  cc_emails: string[]
+  ai_summary: string | null
+  attention_reason: string | null
+  first_sent_at: string | null
+  last_inbound_at: string | null
+  followups_sent: number
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type OutreachLecture = {
+  outreach_id: string
+  lecture_id: string
+  position: number
+  response: 'pending' | 'yes' | 'no'
+}
+
+export type EmailKind = 'request' | 'followup' | 'ack_yes' | 'ack_no' | 'confirmation' | 'manual' | 'reply' | 'bounce'
+export type EmailStatus = 'queued' | 'sending' | 'sent' | 'failed' | 'cancelled' | 'received'
+
+export type EmailMessage = {
+  id: string
+  outreach_id: string
+  direction: 'outbound' | 'inbound'
+  kind: EmailKind
+  status: EmailStatus
+  from_email: string | null
+  to_emails: string[]
+  cc_emails: string[]
+  subject: string
+  body: string
+  reply_to_gmail_message_id: string | null
+  gmail_message_id: string | null
+  gmail_thread_id: string | null
+  error: string | null
+  classification: ReplyClassification | null
+  classified_at: string | null
+  processing_error: string | null
+  attempts: number
+  queued_at: string | null
+  lease_at: string | null
+  sent_at: string | null
+  received_at: string | null
+  created_by: string | null
+  created_at: string
+}
+
+export type ReplyCategory = 'yes' | 'no' | 'question' | 'redirect' | 'out_of_office' | 'do_not_contact' | 'other'
+
+export type ReplyClassification = {
+  category: ReplyCategory
+  confidence: 'high' | 'medium' | 'low'
+  summary: string
+  lecture_decisions: { lecture_number: number; decision: 'yes' | 'no' | 'unclear' }[]
+  conditions: string | null
+  mentioned_dates: string[]
+  redirect_contact: string | null
+  needs_human: boolean
+  reason_for_human: string | null
+}
