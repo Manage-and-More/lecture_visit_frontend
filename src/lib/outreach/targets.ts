@@ -1,5 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { extrapolateDates } from '@/lib/date-utils'
+import { loadMembers } from '@/lib/scheduling/calendar'
+import { covers, toMinutes } from '@/lib/scheduling/time'
 import type { LectureSchedule, MailSettings } from '@/types/database'
 
 type Db = SupabaseClient
@@ -17,6 +19,10 @@ export type TargetLecture = {
   title: string
   lectureType: string | null
   nextSession: string | null // label, e.g. "Di. 17.11.2026, 10:15 - 11:45"
+  /** First upcoming session where team members are free, and who */
+  match: { label: string; members: string[] } | null
+  /** How many upcoming sessions fit at least one team member */
+  matchingSessions: number
 }
 
 export type TargetCandidate = {
@@ -33,7 +39,13 @@ export type TargetResult = {
   semester: string
   candidates: TargetCandidate[]
   skipped: { reason: string; count: number }[]
+  /** Team members who entered any availability */
+  membersWithAvailability: number
+  onlyMatching: boolean
 }
+
+/** A member counts as free for a visit if their availability covers 30 minutes from the start. */
+const VISIT_WINDOW_MINUTES = 30
 
 const CHUNK = 150
 
@@ -61,8 +73,11 @@ function displayName(p: ProfessorRow): string {
  * starred lectures, of the configured type, with at least one session left. One candidate per
  * lecturer, who gets one email covering all their target lectures.
  */
-export async function findTargets(db: Db, semester: string, settings: MailSettings): Promise<TargetResult> {
+export async function findTargets(
+  db: Db, semester: string, settings: MailSettings, options: { onlyMatching: boolean } = { onlyMatching: true },
+): Promise<TargetResult> {
   const skipped = new Map<string, number>()
+  const members = (await loadMembers(db)).filter(m => m.slots.length > 0)
   const skip = (reason: string, n = 1) => skipped.set(reason, (skipped.get(reason) ?? 0) + n)
 
   const { data: programs } = await db.from('study_programs').select('id').eq('is_starred', true)
@@ -119,6 +134,18 @@ export async function findTargets(db: Db, semester: string, settings: MailSettin
       continue
     }
 
+    // Step 3 of the workflow: sessions that fall into someone's availability
+    const matching = upcoming
+      .map(s => {
+        const start = toMinutes(s.startTime)
+        return { session: s, free: members.filter(m => covers(m.slots, s.date, start, start + VISIT_WINDOW_MINUTES)) }
+      })
+      .filter(x => x.free.length > 0)
+    if (options.onlyMatching && matching.length === 0) {
+      skip("No session fits anyone's availability")
+      continue
+    }
+
     const professors = lecture.lecture_professors
       .map(lp => lp.professor)
       .filter((p): p is ProfessorRow => Boolean(p))
@@ -157,6 +184,8 @@ export async function findTargets(db: Db, semester: string, settings: MailSettin
       title: lecture.title,
       lectureType: lecture.lecture_type,
       nextSession: upcoming[0]?.label ?? null,
+      match: matching[0] ? { label: matching[0].session.label, members: matching[0].free.map(m => m.name) } : null,
+      matchingSessions: matching.length,
     })
     if (!hasSchedule && !candidate.warnings.includes('A lecture has no schedule')) {
       candidate.warnings.push('A lecture has no schedule')
@@ -174,5 +203,7 @@ export async function findTargets(db: Db, semester: string, settings: MailSettin
     semester,
     candidates,
     skipped: [...skipped.entries()].map(([reason, count]) => ({ reason, count })).sort((a, b) => b.count - a.count),
+    membersWithAvailability: members.length,
+    onlyMatching: options.onlyMatching,
   }
 }
