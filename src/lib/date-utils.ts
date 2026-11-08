@@ -93,13 +93,15 @@ export function parseIntervalWeeks(frequency: string | null): number {
 
 export const WEEKS_PER_PAGE = 2
 
-export function extrapolateDates(schedules: LectureSchedule[], weeksOffset: number, weeks: number = WEEKS_PER_PAGE): ExtrapolatedDate[] {
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const pageStart = new Date(today)
-  pageStart.setDate(pageStart.getDate() + weeksOffset * 7)
-  const pageEnd = new Date(pageStart)
-  pageEnd.setDate(pageEnd.getDate() + weeks * 7)
+/**
+ * All sessions of the given slots between two days (both inclusive, compared by calendar day).
+ * Dates are in the local time zone of the runtime: the browser, or Europe/Berlin on the server.
+ */
+export function sessionsInRange(schedules: LectureSchedule[], from: Date, to: Date): ExtrapolatedDate[] {
+  const rangeStart = new Date(from)
+  rangeStart.setHours(0, 0, 0, 0)
+  const rangeEnd = new Date(to)
+  rangeEnd.setHours(0, 0, 0, 0)
 
   const results: ExtrapolatedDate[] = []
 
@@ -109,8 +111,8 @@ export function extrapolateDates(schedules: LectureSchedule[], weeksOffset: numb
     if (!parsed) continue
 
     const range = schedule.date_range ? parseDateRange(schedule.date_range) : null
-    const windowStart = new Date(Math.max(pageStart.getTime(), today.getTime(), range?.start.getTime() ?? 0))
-    const windowEnd = new Date(Math.min(pageEnd.getTime(), range?.end.getTime() ?? pageEnd.getTime()))
+    const windowStart = new Date(Math.max(rangeStart.getTime(), range?.start.getTime() ?? 0))
+    const windowEnd = new Date(Math.min(rangeEnd.getTime(), range?.end.getTime() ?? rangeEnd.getTime()))
 
     if (windowStart > windowEnd) continue
 
@@ -140,7 +142,7 @@ export function extrapolateDates(schedules: LectureSchedule[], weeksOffset: numb
       continue
     }
 
-    // Biweekly sessions count from the first session of the range, not from today
+    // Biweekly sessions count from the first session of the range, not from the window start
     const stepDays = parseIntervalWeeks(schedule.frequency) * 7
     for (const abbr of parsed.days) {
       const cursor = new Date(stepDays > 7 && range ? range.start : windowStart)
@@ -156,6 +158,18 @@ export function extrapolateDates(schedules: LectureSchedule[], weeksOffset: numb
 
   results.sort((a, b) => a.date.getTime() - b.date.getTime())
   return results
+}
+
+/** Sessions from today on, in pages of `weeks` weeks (page `weeksOffset` / weeks). */
+export function extrapolateDates(schedules: LectureSchedule[], weeksOffset: number, weeks: number = WEEKS_PER_PAGE): ExtrapolatedDate[] {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const pageStart = new Date(today)
+  pageStart.setDate(pageStart.getDate() + weeksOffset * 7)
+  const pageEnd = new Date(pageStart)
+  pageEnd.setDate(pageEnd.getDate() + weeks * 7)
+  const from = new Date(Math.max(pageStart.getTime(), today.getTime()))
+  return sessionsInRange(schedules, from, pageEnd)
 }
 
 export function hasMoreDates(schedules: LectureSchedule[], weeksOffset: number): boolean {

@@ -230,3 +230,30 @@ export type ReplyClassification = {
   needs_human: boolean
   reason_for_human: string | null
 }
+
+// Visit planning (supabase/migrations/20261108_member_availability.sql)
+export type VisitStatus = 'planned' | 'confirmed' | 'done' | 'cancelled'
+
+export type Visit = {
+  id: string
+  lecture_id: string
+  outreach_id: string | null
+  semester: SemesterType
+  scheduled_for: string | null
+  duration_minutes: number
+  location: string | null
+  status: VisitStatus
+  assignee_ids: string[]
+  notes: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type MemberAvailability = {
+  id: string
+  profile_id: string
+  weekday: number // 1 = Monday, 7 = Sunday
+  start_time: string // "HH:MM:SS"
+  end_time: string
+  created_at: string
+}
