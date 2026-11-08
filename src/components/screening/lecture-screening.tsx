@@ -90,12 +90,12 @@ export function LectureScreening({ canEdit }: { canEdit: boolean }) {
 
       {data && (
         <div className="overflow-x-auto rounded-lg border bg-white">
-          <table className="w-full min-w-[900px] text-sm">
+          <table className="w-full min-w-[980px] table-fixed text-sm">
             <thead className="border-b text-left text-xs text-muted-foreground">
               <tr>
                 <th className="w-20 px-3 py-2 font-medium">Relevant</th>
-                <th className="px-3 py-2 font-medium">Lecture</th>
-                <th className="w-28 px-3 py-2 font-medium">Est. audience</th>
+                <th className="w-[30%] px-3 py-2 font-medium">Lecture</th>
+                <th className="w-40 px-3 py-2 font-medium">Est. audience</th>
                 <th className="px-3 py-2 font-medium">Programs</th>
               </tr>
             </thead>
