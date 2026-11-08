@@ -50,7 +50,7 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ## Deployment
 
-Hosted on [Fly.io](https://fly.io) as app `mm-lecture-visit` (region `fra`): https://mm-lecture-visit.fly.dev
+Hosted on [Fly.io](https://fly.io) as app `mm-lecture-visit` (region `iad`, next to the Supabase database in us-east-1): https://mm-lecture-visit.fly.dev
 
 - **Release:** open a PR from `main` into `production`. Merging it runs `.github/workflows/deploy.yml`, which builds the `Dockerfile` on Fly's builders and rolls it out. A manual `fly deploy` from a laptop does the same.
 - **Public build values** (Supabase URL and publishable key) are `[build.args]` in `fly.toml`, because Next.js inlines `NEXT_PUBLIC_*` at build time.

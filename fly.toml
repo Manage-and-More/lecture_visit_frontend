@@ -1,7 +1,8 @@
 # Fly.io app config. Deployed by .github/workflows/deploy.yml when `production` is updated.
 # Secrets (MAILJET_API_KEY, MAILJET_SECRET_KEY, CALENDAR_ORGANIZER_*) are set once with `fly secrets set`.
 app = "mm-lecture-visit"
-primary_region = "fra"
+# Next to the Supabase database (us-east-1): every page makes several database queries
+primary_region = "iad"
 
 [build]
   dockerfile = "Dockerfile"
