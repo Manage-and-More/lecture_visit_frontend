@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "next lint",
     "outreach:inbox": "tsx scripts/outreach/inbox.ts",
-    "outreach:apply": "tsx scripts/outreach/apply.ts"
+    "outreach:apply": "tsx scripts/outreach/apply.ts",
+    "screening:score": "tsx scripts/screening/score.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.6.0",

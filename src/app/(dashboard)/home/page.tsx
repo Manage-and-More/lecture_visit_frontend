@@ -2,7 +2,7 @@ import Link from 'next/link'
 
 // The order is the workflow
 const STEPS = [
-  { title: 'Screen relevant lectures', href: '/calendar' },
+  { title: 'Screen relevant lectures', href: '/lectures' },
   { title: 'Enter your availability', href: '/availability' },
   { title: 'Match lectures to free times', href: '/outreach' },
   { title: 'Run the outreach', href: '/outreach' },
