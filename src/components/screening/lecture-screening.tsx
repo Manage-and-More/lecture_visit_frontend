@@ -8,6 +8,7 @@ import { useToast } from '@/hooks/use-toast'
 import {
   getScreeningPage, setLectureTarget, type ScreeningFilters, type ScreeningPage,
 } from '@/app/actions/screening'
+import { truncateLabel } from '@/lib/screening/score'
 import { cn } from '@/lib/utils'
 
 const MAX_CHIPS = 5
@@ -121,7 +122,7 @@ export function LectureScreening({ canEdit }: { canEdit: boolean }) {
                         onChange={e => toggle(row.id, e.target.checked)} className="h-4 w-4" />
                     </td>
                     <td className="px-3 py-3">
-                      <div className="font-medium">{row.title}</div>
+                      <div className="font-medium line-clamp-2" title={row.title}>{row.title}</div>
                       <div className="text-xs text-muted-foreground">
                         {row.university}{row.lectureType ? ` · ${row.lectureType}` : ''}{row.nextSession ? ` · next: ${row.nextSession}` : ''}
                         {!row.hasEmail && ' · no lecturer email'}
@@ -129,17 +130,17 @@ export function LectureScreening({ canEdit }: { canEdit: boolean }) {
                     </td>
                     <td className="px-3 py-3">
                       <div className="font-semibold tabular-nums" title={row.reasons.join('\n')}>{row.score.toFixed(1)}</div>
-                      <div className="mt-1 text-[11px] leading-snug text-muted-foreground">{row.reasons[0]}</div>
+                      <div className="mt-1 text-[11px] leading-snug text-muted-foreground line-clamp-2" title={row.reasons.join('\n')}>{row.reasons[0]}</div>
                     </td>
                     <td className="px-3 py-3">
                       {row.programs.length === 0 ? <span className="text-xs text-muted-foreground">No program information</span> : (
                         <div className="flex flex-wrap gap-1">
                           {chips.map(p => (
                             <span key={p.name}
-                              title={`${p.mandatory ? 'Mandatory' : 'Not mandatory'}${p.semester ? `, ${p.semester}. semester` : ''}${p.reached ? ', already reached by a target lecture' : ''}`}
+                              title={`${p.name}: ${p.mandatory ? 'mandatory' : 'not mandatory'}${p.semester ? `, ${p.semester}. semester` : ''}${p.reached ? ', already reached by a target lecture' : ''}`}
                               className={cn('rounded px-1.5 py-0.5 text-[11px]',
                                 p.reached ? 'bg-zinc-100 text-zinc-500' : p.mandatory ? 'bg-emerald-100 text-emerald-900 font-medium' : 'bg-slate-100 text-slate-700')}>
-                              {p.name}{p.semester ? ` · ${p.semester}.` : ''}
+                              {truncateLabel(p.name, 40)}{p.semester ? ` · ${p.semester}.` : ''}
                             </span>
                           ))}
                           {row.programs.length > MAX_CHIPS && (
