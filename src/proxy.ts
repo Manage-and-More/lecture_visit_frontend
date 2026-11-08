@@ -68,7 +68,7 @@ export async function proxy(request: NextRequest) {
   const authOnlyPaths = ['/auth/login', '/auth/signup', '/auth/forgot-password']
   if (user && authOnlyPaths.includes(request.nextUrl.pathname)) {
     const url = request.nextUrl.clone()
-    url.pathname = '/scheduled'
+    url.pathname = '/outreach'
     return NextResponse.redirect(url)
   }
 

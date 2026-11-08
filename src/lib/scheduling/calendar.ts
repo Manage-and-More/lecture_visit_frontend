@@ -130,17 +130,19 @@ export async function loadCalendarWeek(
     university_id: string
     university: { name: string } | null
     schedules: LectureSchedule[]
-    lecture_professors: { professor: { title: string | null; first_name: string | null; last_name: string | null } | null }[]
+    lecture_professors: { professor: { title: string | null; first_name: string | null; last_name: string | null; email: string | null } | null }[]
   }
   const lectures: LectureRow[] = []
   for (const ids of chunks(lectureIds)) {
     let query = db.from('lectures')
-      .select('id, title, lecture_type, university_id, university:universities(name), schedules:lecture_schedules(*), lecture_professors(professor:professors(title, first_name, last_name))')
+      .select('id, title, lecture_type, university_id, university:universities(name), schedules:lecture_schedules(*), lecture_professors(professor:professors(title, first_name, last_name, email))')
       .in('id', ids)
       .eq('semester', semester)
     if (allowedUniversities) query = query.in('university_id', allowedUniversities)
     const { data } = await query
-    lectures.push(...((data ?? []) as unknown as LectureRow[]))
+    // Only lectures we can actually ask: at least one lecturer with a known email address
+    lectures.push(...((data ?? []) as unknown as LectureRow[])
+      .filter(l => l.lecture_professors.some(lp => lp.professor?.email?.trim())))
   }
   // The cap applies after the semester and university filters, so no current lecture is dropped for an old one
   const truncated = lectures.length > MAX_LECTURES

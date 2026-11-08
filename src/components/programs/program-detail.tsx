@@ -1,6 +1,5 @@
 'use client'
 import { useState, useEffect } from 'react'
-import Link from 'next/link'
 import { ExternalLink, FileText, BookOpen, Plus, Loader2, X, ChevronRight } from 'lucide-react'
 import { UniversityBadge } from '@/components/university-badge'
 import { SearchInput } from '@/components/search-input'
@@ -156,7 +155,7 @@ export function ProgramDetail({ program, lectures }: ProgramDetailProps) {
                       {group.map(lecture => (
                         <div key={lecture.id} className="group flex items-center rounded-lg px-3 py-2.5 hover:bg-black/[0.03] transition-all duration-200">
                           <StarToggle id={lecture.id} type="lecture" initialStarred={!!lecture.is_starred} size="sm" />
-                          <Link href={`/lectures/${lecture.id}`} className="flex-1 min-w-0 ml-1">
+                          <div className="flex-1 min-w-0 ml-1">
                             <div className="flex items-center gap-2">
                               <span className="text-sm font-medium">{lecture.title}</span>
                               {lecture.lecture_type && (
@@ -168,7 +167,7 @@ export function ProgramDetail({ program, lectures }: ProgramDetailProps) {
                             {lecture.semester && (
                               <span className="text-xs text-muted-foreground">{lecture.semester}</span>
                             )}
-                          </Link>
+                          </div>
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
                               <button

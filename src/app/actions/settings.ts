@@ -4,50 +4,6 @@ import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import type { Parameter, Profile } from '@/types/database'
 
-export async function getParameters(): Promise<Parameter[]> {
-  const supabase = await createClient()
-  const { data, error } = await supabase
-    .from('parameters')
-    .select('*')
-    .order('key')
-
-  if (error) throw error
-  return data ?? []
-}
-
-export async function updateParameter(key: string, value: string): Promise<void> {
-  const supabase = await createClient()
-
-  const { error } = await supabase
-    .from('parameters')
-    .update({ value })
-    .eq('key', key)
-
-  if (error) throw error
-  revalidatePath('/settings')
-}
-
-export async function ensureEmailTemplate(): Promise<void> {
-  const supabase = await createClient()
-
-  // Check if email_template exists
-  const { data } = await supabase
-    .from('parameters')
-    .select('key')
-    .eq('key', 'email_template')
-    .single()
-
-  if (!data) {
-    // Insert email_template if it doesn't exist
-    await supabase
-      .from('parameters')
-      .insert({
-        key: 'email_template',
-        value: 'Dear Professor {name},\n\n[Your email template here]'
-      })
-  }
-}
-
 export async function getCurrentUserProfile() {
   const supabase = await createClient()
 

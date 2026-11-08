@@ -16,7 +16,8 @@ export default async function OutreachPage() {
         <OutreachDashboard overview={overview} settings={overview.settings} />
       ) : (
         <div className="rounded-lg border bg-white p-6 text-sm text-muted-foreground">
-          Only admins can manage outreach. Ask an admin to give your profile admin rights.
+          Only admins can manage outreach. To take part in visits, enter your free times under{' '}
+          <a href="/availability" className="underline">My availability</a>.
         </div>
       )}
     </div>
