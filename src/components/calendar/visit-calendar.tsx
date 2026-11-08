@@ -185,7 +185,7 @@ export function VisitCalendar() {
       {week && (
         <>
           <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
-            <span>{week.sessions.length} sessions this week{week.truncated ? ' (only the first 600 lectures: narrow the filter)' : ''}</span>
+            <span>{week.sessions.length} sessions this week, only lectures with a known lecturer email{week.truncated ? ' (first 600 lectures only: narrow the filter)' : ''}</span>
             <span className="flex items-center gap-1"><span className="inline-block h-3 w-3 rounded-sm bg-emerald-500/30" /> members free</span>
             <span className="flex items-center gap-1"><span className="inline-block h-3 w-3 rounded-sm border-2 border-dashed border-violet-600" /> proposed visit</span>
             <span className="flex items-center gap-1"><span className="inline-block h-3 w-3 rounded-sm bg-violet-600" /> accepted visit</span>
