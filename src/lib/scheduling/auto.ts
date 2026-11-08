@@ -4,7 +4,7 @@ import { renderTemplated } from '@/lib/outreach/engine'
 import { cleanLectureTitle } from '@/lib/outreach/templates'
 import type { EmailMessage, LectureSchedule, MailSettings, ReplyClassification, Visit } from '@/types/database'
 import { loadMembers, type CalendarMember } from './calendar'
-import { covers, isoWeekday, toDateKey, toMinutes } from './time'
+import { covers, toDateKey, toMinutes } from './time'
 
 type Db = SupabaseClient
 
@@ -90,7 +90,7 @@ export async function proposeVisits(
     for (const session of sessions) {
       const start = toMinutes(session.startTime)
       const free = members
-        .filter(m => covers(m.slots, isoWeekday(session.date), start, start + VISIT_WINDOW_MINUTES))
+        .filter(m => covers(m.slots, session.date, start, start + VISIT_WINDOW_MINUTES))
         .filter(m => !isBusy(busy, m.id, session.date))
         .sort((a, b) => (load.get(a.id) ?? 0) - (load.get(b.id) ?? 0))
       if (free.length >= 2) { choice = { session, team: free.slice(0, 2) }; break }

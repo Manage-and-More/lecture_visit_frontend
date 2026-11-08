@@ -30,9 +30,24 @@ export function fromDateKey(key: string): Date {
   return new Date(y, m - 1, d)
 }
 
-export type Slot = { weekday: number; start: number; end: number } // minutes
+/** An availability entry: minutes since midnight on `date`, optionally repeating weekly. */
+export type Slot = {
+  date: string // YYYY-MM-DD, the first (or only) day
+  start: number
+  end: number
+  repeatsWeekly: boolean
+  repeatUntil: string | null // YYYY-MM-DD, inclusive
+}
 
-/** True if the slots cover the whole interval [start, end) on that weekday. */
-export function covers(slots: Slot[], weekday: number, start: number, end: number): boolean {
-  return slots.some(s => s.weekday === weekday && s.start <= start && s.end >= end)
+/** True if the entry takes place on that calendar day. */
+export function occursOn(slot: Slot, day: Date): boolean {
+  const key = toDateKey(day)
+  if (!slot.repeatsWeekly) return slot.date === key
+  if (key < slot.date || (slot.repeatUntil && key > slot.repeatUntil)) return false
+  return isoWeekday(fromDateKey(slot.date)) === isoWeekday(day)
+}
+
+/** True if one entry covers the whole interval [start, end) on that day. */
+export function covers(slots: Slot[], day: Date, start: number, end: number): boolean {
+  return slots.some(s => occursOn(s, day) && s.start <= start && s.end >= end)
 }

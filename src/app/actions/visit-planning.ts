@@ -88,7 +88,18 @@ export async function discardVisit(visitId: string): Promise<void> {
   revalidatePath('/calendar')
 }
 
-export type AvailabilitySlot = { weekday: number; start: string; end: string } // "HH:MM"
+/** One availability entry of the signed-in member, as shown on "My availability". */
+export type AvailabilityEntry = {
+  id: string
+  date: string // YYYY-MM-DD, first (or only) day
+  start: string // "HH:MM"
+  end: string
+  repeatsWeekly: boolean
+  repeatUntil: string | null
+}
+
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
+const TIME_RE = /^\d{2}:\d{2}$/
 
 /** Whether the signed-in user is on the current visit team (public.team_members). */
 export async function amIOnTheTeam(): Promise<boolean> {
@@ -99,31 +110,52 @@ export async function amIOnTheTeam(): Promise<boolean> {
   return Boolean(data)
 }
 
-export async function getMyAvailability(): Promise<AvailabilitySlot[]> {
+export async function getMyAvailability(): Promise<AvailabilityEntry[]> {
   const { supabase, userId } = await requireUser()
   const { data, error } = await supabase.from('member_availability')
-    .select('weekday, start_time, end_time').eq('profile_id', userId).order('weekday').order('start_time')
+    .select('id, date, start_time, end_time, repeats_weekly, repeat_until')
+    .eq('profile_id', userId).order('date').order('start_time')
   if (error) throw error
   return (data ?? []).map(s => ({
-    weekday: s.weekday as number,
+    id: s.id as string,
+    date: s.date as string,
     start: fromMinutes(toMinutes(s.start_time as string)),
     end: fromMinutes(toMinutes(s.end_time as string)),
+    repeatsWeekly: s.repeats_weekly as boolean,
+    repeatUntil: (s.repeat_until as string | null) ?? null,
   }))
 }
 
-export async function saveMyAvailability(slots: AvailabilitySlot[]): Promise<void> {
+/** Creates an entry, or updates one of the member's own entries when `id` is given. */
+export async function saveAvailabilityEntry(entry: Omit<AvailabilityEntry, 'id'> & { id?: string }): Promise<void> {
   const { supabase, userId } = await requireUser()
-  for (const s of slots) {
-    if (s.weekday < 1 || s.weekday > 7 || toMinutes(s.end) <= toMinutes(s.start)) throw new Error('Invalid time slot')
+  if (!DATE_RE.test(entry.date) || !TIME_RE.test(entry.start) || !TIME_RE.test(entry.end)) {
+    throw new Error('Enter a date and start and end times')
   }
-  const { error: deleteError } = await supabase.from('member_availability').delete().eq('profile_id', userId)
-  if (deleteError) throw deleteError
-  if (slots.length) {
-    const { error } = await supabase.from('member_availability').insert(
-      slots.map(s => ({ profile_id: userId, weekday: s.weekday, start_time: s.start, end_time: s.end })),
-    )
-    if (error) throw error
+  if (toMinutes(entry.end) <= toMinutes(entry.start)) throw new Error('The end has to be after the start')
+  const repeatUntil = entry.repeatsWeekly && entry.repeatUntil ? entry.repeatUntil : null
+  if (repeatUntil && (!DATE_RE.test(repeatUntil) || repeatUntil < entry.date)) {
+    throw new Error('"Until" has to be on or after the first day')
   }
+  const row = {
+    profile_id: userId,
+    date: entry.date,
+    start_time: entry.start,
+    end_time: entry.end,
+    repeats_weekly: entry.repeatsWeekly,
+    repeat_until: repeatUntil,
+  }
+  const { error } = entry.id
+    ? await supabase.from('member_availability').update(row).eq('id', entry.id).eq('profile_id', userId)
+    : await supabase.from('member_availability').insert(row)
+  if (error) throw error
+  revalidatePath('/availability')
+}
+
+export async function deleteAvailabilityEntry(id: string): Promise<void> {
+  const { supabase, userId } = await requireUser()
+  const { error } = await supabase.from('member_availability').delete().eq('id', id).eq('profile_id', userId)
+  if (error) throw error
   revalidatePath('/availability')
 }
 

@@ -248,12 +248,18 @@ export async function loadMembers(db: Db): Promise<CalendarMember[]> {
   const { data: profiles } = await db.from('profiles').select('id, email').in('email', [...teamNames.keys()])
   const profileIds = (profiles ?? []).map(p => p.id as string)
   const { data: slots } = profileIds.length
-    ? await db.from('member_availability').select('profile_id, weekday, start_time, end_time').in('profile_id', profileIds)
+    ? await db.from('member_availability').select('profile_id, date, start_time, end_time, repeats_weekly, repeat_until').in('profile_id', profileIds)
     : { data: [] }
   const byProfile = new Map<string, Slot[]>()
   for (const s of slots ?? []) {
     const list = byProfile.get(s.profile_id as string) ?? []
-    list.push({ weekday: s.weekday as number, start: toMinutes(s.start_time as string), end: toMinutes(s.end_time as string) })
+    list.push({
+      date: s.date as string,
+      start: toMinutes(s.start_time as string),
+      end: toMinutes(s.end_time as string),
+      repeatsWeekly: s.repeats_weekly as boolean,
+      repeatUntil: (s.repeat_until as string | null) ?? null,
+    })
     byProfile.set(s.profile_id as string, list)
   }
   return (profiles ?? [])
