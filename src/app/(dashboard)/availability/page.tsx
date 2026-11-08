@@ -1,15 +1,15 @@
 import { amIOnTheTeam, getMyAvailability, getMyVisits } from '@/app/actions/visit-planning'
-import { AvailabilityEditor } from '@/components/availability/availability-editor'
+import { AvailabilityCalendar } from '@/components/availability/availability-calendar'
 
 export default async function AvailabilityPage() {
-  const [slots, visits, onTeam] = await Promise.all([getMyAvailability(), getMyVisits(), amIOnTheTeam()])
+  const [entries, visits, onTeam] = await Promise.all([getMyAvailability(), getMyVisits(), amIOnTheTeam()])
 
   return (
     <div className="animate-fade-in-up space-y-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">My availability</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Mark the times you can usually visit a lecture. Visits are planned only in times you marked.
+          Add the times you can visit a lecture, on single days or repeating every week.
         </p>
       </div>
       {!onTeam && (
@@ -17,7 +17,7 @@ export default async function AvailabilityPage() {
           You&apos;re not on the current visit team, so visits won&apos;t be planned for you. Ask an admin to add you.
         </p>
       )}
-      <AvailabilityEditor initialSlots={slots} />
+      <AvailabilityCalendar entries={entries} />
       <section className="rounded-lg border bg-white p-4 text-sm space-y-2">
         <h2 className="font-medium">My upcoming visits</h2>
         {visits.length === 0 ? <p className="text-muted-foreground">No visits planned for you yet.</p> : (

@@ -25,10 +25,10 @@ type Props = {
 }
 
 /** Members free at that time (availability covers 30 minutes) and not on another visit nearby. */
-function freeMembers(members: CalendarMember[], visits: CalendarVisit[], weekday: number, startMinutes: number, startIso: string, ignoreVisitId?: string) {
+function freeMembers(members: CalendarMember[], visits: CalendarVisit[], startMinutes: number, startIso: string, ignoreVisitId?: string) {
   const start = new Date(startIso).getTime()
   return members.filter(m =>
-    covers(m.slots, weekday, startMinutes, startMinutes + 30) &&
+    covers(m.slots, new Date(startIso), startMinutes, startMinutes + 30) &&
     !visits.some(v => v.id !== ignoreVisitId && v.assigneeIds.includes(m.id) &&
       Math.abs(new Date(v.start).getTime() - start) < MIN_GAP_MINUTES * 60_000))
 }
@@ -82,7 +82,7 @@ export function DetailPanel({ selection, members, visits, onClose, onChanged }: 
 
   if (selection.kind === 'session') {
     const s = selection.session
-    const free = new Set(freeMembers(members, visits, s.weekday, s.startMinutes, s.start).map(m => m.id))
+    const free = new Set(freeMembers(members, visits, s.startMinutes, s.start).map(m => m.id))
     return (
       <SidePanel open onClose={onClose} title={s.title} width="w-[560px]">
         <div className="space-y-5 p-6 text-sm">
@@ -119,7 +119,7 @@ export function DetailPanel({ selection, members, visits, onClose, onChanged }: 
   }
 
   const v = selection.visit
-  const free = new Set(freeMembers(members, visits, v.weekday, v.startMinutes, v.start, v.id).map(m => m.id))
+  const free = new Set(freeMembers(members, visits, v.startMinutes, v.start, v.id).map(m => m.id))
   const start = new Date(v.start)
   return (
     <SidePanel open onClose={onClose} title={`${v.status === 'planned' ? 'Proposed visit' : 'Visit'}: ${v.title}`} width="w-[560px]">
