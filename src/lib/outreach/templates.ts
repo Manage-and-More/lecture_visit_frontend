@@ -7,29 +7,38 @@ type ProfessorName = {
 }
 
 /**
- * Neutral salutation name: "Prof. Dr. Müller", "Dr. Müller", or the full name.
- * Degree suffixes such as "rer. nat." or "M.Sc." are left out, as in a normal letter.
+ * Gender-neutral salutation name for an English email: "Professor Müller", "Dr. Müller",
+ * or the full name. Degree suffixes such as "rer. nat." or "M.Sc." are left out.
  */
 export function salutationName(p: ProfessorName): string {
   const last = (p.last_name ?? '').trim()
   const first = (p.first_name ?? '').trim()
   const title = p.title ?? ''
-  const hasProf = /prof/i.test(title)
-  const hasDr = /\bdr\b|dr\./i.test(title)
-  if (last && hasProf) return `${hasDr ? 'Prof. Dr.' : 'Prof.'} ${last}`
-  if (last && hasDr) return `Dr. ${last}`
-  return [first, last].filter(Boolean).join(' ') || 'Damen und Herren'
+  if (last && /prof/i.test(title)) return `Professor ${last}`
+  if (last && /\bdr\b|dr\./i.test(title)) return `Dr. ${last}`
+  return [first, last].filter(Boolean).join(' ') || 'Sir or Madam'
 }
 
-/** "in Ihrer Vorlesung „X“" or "in einer Ihrer Vorlesungen („A“ oder „B“)". */
+/**
+ * Lecture title as a lecturer would say it: without TUM module codes such as "[MA0003]" or
+ * "(MGT001365, englisch)" at the end.
+ */
+export function cleanLectureTitle(title: string): string {
+  return title
+    .replace(/\s*\[[^\]]*\]\s*$/, '')
+    .replace(/\s*\([^)]*[A-Z]{2,}\d{3,}[^)]*\)\s*$/, '')
+    .trim() || title
+}
+
+/** "your lecture “X”" or "one of your lectures (“A” or “B”)". */
 export function lecturePhrase(titles: string[]): string {
-  const quoted = titles.map(t => `„${t}“`)
-  if (quoted.length === 0) return 'in Ihrer Vorlesung'
-  if (quoted.length === 1) return `in Ihrer Vorlesung ${quoted[0]}`
+  const quoted = titles.map(t => `“${cleanLectureTitle(t)}”`)
+  if (quoted.length === 0) return 'one of your lectures'
+  if (quoted.length === 1) return `your lecture ${quoted[0]}`
   const list = quoted.length === 2
-    ? `${quoted[0]} oder ${quoted[1]}`
-    : `${quoted.slice(0, -1).join(', ')} oder ${quoted[quoted.length - 1]}`
-  return `in einer Ihrer Vorlesungen (${list})`
+    ? `${quoted[0]} or ${quoted[1]}`
+    : `${quoted.slice(0, -1).join(', ')} or ${quoted[quoted.length - 1]}`
+  return `one of your lectures (${list})`
 }
 
 /** Replaces {key} placeholders; unknown keys stay visible so they're caught before sending. */

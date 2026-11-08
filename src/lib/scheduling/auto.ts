@@ -1,9 +1,10 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { sessionsInRange } from '@/lib/date-utils'
 import { renderTemplated } from '@/lib/outreach/engine'
+import { cleanLectureTitle } from '@/lib/outreach/templates'
 import type { EmailMessage, LectureSchedule, MailSettings, ReplyClassification, Visit } from '@/types/database'
 import { loadMembers, type CalendarMember } from './calendar'
-import { covers, isoWeekday, toMinutes } from './time'
+import { covers, isoWeekday, toDateKey, toMinutes } from './time'
 
 type Db = SupabaseClient
 
@@ -25,9 +26,9 @@ function isBusy(busy: Busy, memberId: string, start: Date): boolean {
 }
 
 /**
- * Proposes a visit for every lecture whose lecturer said yes and that has no visit yet: the
- * earliest session in the coming weeks where two members (or at least one) are free, preferring
- * members with fewer visits. Proposals are saved as "planned" visits for a person to accept.
+ * Proposes a visit for every lecture whose lecturer said yes and that has no visit yet: a session
+ * on a date the lecturer suggested if possible, otherwise the earliest session in the coming weeks,
+ * where two members (or at least one) are free, preferring members with fewer visits. Proposals are saved as "planned" visits for a person to accept.
  */
 export async function proposeVisits(
   db: Db, semester: string, options: { weeksAhead: number },
@@ -66,8 +67,16 @@ export async function proposeVisits(
       .select('title, schedules:lecture_schedules(*)').eq('id', lectureId).single()
     if (!lecture) continue
     const title = lecture.title as string
+    const { data: replies } = await db.from('email_messages')
+      .select('classification').eq('outreach_id', outreachId).eq('direction', 'inbound')
+      .not('classification', 'is', null).order('received_at', { ascending: false }).limit(1)
+    const classification = replies?.[0]?.classification as ReplyClassification | null
+    const conditions = classification?.conditions
+    // Dates the lecturer suggested come first; otherwise the earliest session wins
+    const suggested = new Set(classification?.mentioned_dates ?? [])
     const sessions = sessionsInRange(lecture.schedules as LectureSchedule[], from, to)
       .filter(s => s.date > new Date())
+      .sort((a, b) => Number(suggested.has(toDateKey(b.date))) - Number(suggested.has(toDateKey(a.date))))
     if (sessions.length === 0) {
       result.unscheduled.push({ title, reason: `No session in the next ${options.weeksAhead} weeks` })
       continue
@@ -92,10 +101,6 @@ export async function proposeVisits(
       continue
     }
 
-    const { data: replies } = await db.from('email_messages')
-      .select('classification').eq('outreach_id', outreachId).eq('direction', 'inbound')
-      .not('classification', 'is', null).order('received_at', { ascending: false }).limit(1)
-    const conditions = (replies?.[0]?.classification as ReplyClassification | null)?.conditions
     const { error } = await db.from('visits').insert({
       lecture_id: lectureId,
       outreach_id: outreachId,
@@ -121,10 +126,11 @@ export async function proposeVisits(
   return result
 }
 
-const DATE_FORMAT = new Intl.DateTimeFormat('de-DE', {
-  weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'Europe/Berlin',
+// The email texts are English: "Tuesday, 17 November 2026", "10:15"
+const DATE_FORMAT = new Intl.DateTimeFormat('en-GB', {
+  weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Berlin',
 })
-const TIME_FORMAT = new Intl.DateTimeFormat('de-DE', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Berlin' })
+const TIME_FORMAT = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Europe/Berlin' })
 
 /**
  * Queues the date confirmation to the lecturer, as an answer to their latest reply (or as a
@@ -139,8 +145,8 @@ export async function queueVisitConfirmation(db: Db, settings: MailSettings, vis
   const start = new Date(visit.scheduled_for)
   const { body, subject } = await renderTemplated(db, settings, outreach.id, 'confirmation', {
     visit_date: DATE_FORMAT.format(start),
-    visit_time: `${TIME_FORMAT.format(start)} Uhr`,
-    lecture_title: (lecture?.title as string | undefined) ?? '',
+    visit_time: TIME_FORMAT.format(start),
+    lecture_title: cleanLectureTitle((lecture?.title as string | undefined) ?? ''),
   })
 
   const { data: lastInbound } = await db.from('email_messages')

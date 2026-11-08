@@ -3,7 +3,7 @@ import type {
   EmailMessage, MailSettings, ProfessorOutreach, ReplyClassification,
 } from '@/types/database'
 import { classifyReply, ClassificationRefusedError } from './classify'
-import { findUnfilled, lecturePhrase, render, salutationName, templateFor, type TemplateKind } from './templates'
+import { cleanLectureTitle, findUnfilled, lecturePhrase, render, salutationName, templateFor, type TemplateKind } from './templates'
 
 type Db = SupabaseClient
 
@@ -105,7 +105,7 @@ export async function renderTemplated(
     salutation_name: salutationName(ctx.professor),
     sender_name: settings.sender_name,
     lecture_phrase: lecturePhrase(ctx.lectureTitles),
-    lecture_list: ctx.lectureTitles.map(t => `- ${t}`).join('\n'),
+    lecture_list: ctx.lectureTitles.map(t => `- ${cleanLectureTitle(t)}`).join('\n'),
     original_message: originalMessage,
     ...extra,
   }
