@@ -57,7 +57,7 @@ Scrapers exist but are **not finalized**. The data in the scraper folders is pre
 - **Frontend**: To be built (greenfield) — likely Next.js / React
 - **Backend / Database**: Supabase (PostgreSQL) — schema deployed via 5 migrations
 - **Data Pipeline**: Python scrapers (LMU + TUM) — work in progress, not yet finalized
-- **Hosting**: TBD
+- **Hosting**: Fly.io, app `mm-lecture-visit` (`iad`). Deploys from the `production` branch; see README → Deployment
 
 ## Feature Roadmap
 

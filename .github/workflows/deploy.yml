@@ -1,0 +1,27 @@
+name: Deploy
+
+# Production deploys happen only from the `production` branch. Day-to-day work merges into
+# `main`; a release is a PR from `main` into `production`.
+on:
+  push:
+    branches: [production]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy app to Fly.io
+    runs-on: ubuntu-latest
+    # Environment secrets are only released to runs from the `production` branch
+    # (Settings → Environments → production → Deployment branches).
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      # Fly builds the Dockerfile on its own builders and rolls the new image onto the machine.
+      - run: flyctl deploy --remote-only --ha=false
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
