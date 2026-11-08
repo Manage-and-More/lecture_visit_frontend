@@ -12,15 +12,23 @@ import {
 } from '@/app/actions/visit-planning'
 import type { CalendarScope, CalendarWeek } from '@/lib/scheduling/calendar'
 import type { ProposalResult } from '@/lib/scheduling/auto'
-import { fromDateKey, mondayOf, toDateKey } from '@/lib/scheduling/time'
+import { fromDateKey, isoWeekday, mondayOf, toDateKey } from '@/lib/scheduling/time'
 import { WeekGrid } from './week-grid'
 import { DetailPanel, type Selection } from './detail-panel'
 
 const SCOPES: { value: CalendarScope; label: string }[] = [
-  { value: 'outreach', label: 'Lectures in outreach' },
   { value: 'targets', label: 'Target lectures (starred)' },
+  { value: 'outreach', label: 'Lectures in outreach' },
   { value: 'search', label: 'Search by title' },
 ]
+
+/** This week's Monday; on Sundays the coming week, since the current one is over. */
+function defaultWeekKey(): string {
+  const today = new Date()
+  const monday = mondayOf(today)
+  if (isoWeekday(today) === 7) monday.setDate(monday.getDate() + 7)
+  return toDateKey(monday)
+}
 
 function formatStart(iso: string) {
   return new Date(iso).toLocaleString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
@@ -28,8 +36,8 @@ function formatStart(iso: string) {
 
 export function VisitCalendar() {
   const { toast } = useToast()
-  const [weekKey, setWeekKey] = useState(() => toDateKey(mondayOf(new Date())))
-  const [scope, setScope] = useState<CalendarScope>('outreach')
+  const [weekKey, setWeekKey] = useState(defaultWeekKey)
+  const [scope, setScope] = useState<CalendarScope>('targets')
   const [university, setUniversity] = useState('all')
   const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
@@ -157,7 +165,7 @@ export function VisitCalendar() {
 
       <div className="flex flex-wrap items-center gap-2">
         <Button size="sm" variant="outline" onClick={() => shiftWeek(-1)} aria-label="Previous week"><ChevronLeft /></Button>
-        <Button size="sm" variant="outline" onClick={() => setWeekKey(toDateKey(mondayOf(new Date())))}>This week</Button>
+        <Button size="sm" variant="outline" onClick={() => setWeekKey(defaultWeekKey())}>This week</Button>
         <Button size="sm" variant="outline" onClick={() => shiftWeek(1)} aria-label="Next week"><ChevronRight /></Button>
         <span className="text-sm font-medium tabular-nums">
           {weekStart.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })} – {weekEnd.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })}
