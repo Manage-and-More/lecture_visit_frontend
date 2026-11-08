@@ -2,15 +2,10 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { GraduationCap, BookOpen, Users, Send, Settings, Target, Mail, CalendarDays, Clock } from 'lucide-react'
+import { GraduationCap, Settings, Target, Mail, CalendarDays, Clock } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const navItems = [
-  {
-    title: 'Schedule',
-    href: '/scheduled',
-    icon: Send
-  },
   {
     title: 'Outreach',
     href: '/outreach',
@@ -35,16 +30,6 @@ const navItems = [
     title: 'Programs',
     href: '/programs',
     icon: GraduationCap
-  },
-  {
-    title: 'Lectures',
-    href: '/lectures',
-    icon: BookOpen
-  },
-  {
-    title: 'Professors',
-    href: '/professors',
-    icon: Users
   },
   {
     title: 'Settings',

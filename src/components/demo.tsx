@@ -75,7 +75,7 @@ export default function DemoOne() {
                 Inspire the next generation</p>
                 <div className="pt-4">
                     <Link 
-                        href="/scheduled"
+                        href="/outreach"
                         className="inline-flex items-center gap-2 bg-white/80 backdrop-blur-sm border border-black/10 text-black font-sans font-medium text-base md:text-lg px-6 py-3 rounded-xl hover:bg-black/5 hover:border-black/20 transition-all duration-200 shadow-sm"
                     >
                         Book visit <span aria-hidden="true">→</span>

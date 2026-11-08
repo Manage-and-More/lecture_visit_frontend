@@ -8,8 +8,6 @@ import React from 'react'
 
 const LABELS: Record<string, string> = {
   programs: 'Programs',
-  lectures: 'Lectures',
-  professors: 'Professors',
   settings: 'Settings',
 }
 
