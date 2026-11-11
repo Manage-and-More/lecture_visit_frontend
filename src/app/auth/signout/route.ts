@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
+import { publicUrl } from '@/lib/public-url'
 
 export async function POST(request: NextRequest) {
   const supabaseResponse = NextResponse.next({ request })
@@ -23,10 +24,7 @@ export async function POST(request: NextRequest) {
 
   await supabase.auth.signOut()
 
-  const redirectUrl = request.nextUrl.clone()
-  redirectUrl.pathname = '/'
-
-  const redirect = NextResponse.redirect(redirectUrl)
+  const redirect = NextResponse.redirect(publicUrl(request, '/'))
   // Copy cleared cookies to redirect response
   supabaseResponse.cookies.getAll().forEach((cookie) => {
     redirect.cookies.set(cookie.name, cookie.value)
