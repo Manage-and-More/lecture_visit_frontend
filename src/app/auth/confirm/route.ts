@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
+import { publicUrl } from '@/lib/public-url'
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
@@ -32,14 +33,7 @@ export async function GET(request: NextRequest) {
 
   // Helper to redirect on success, copying session cookies
   function successRedirect(response: NextResponse) {
-    const redirectUrl = request.nextUrl.clone()
-    redirectUrl.pathname = destination
-    redirectUrl.searchParams.delete('token_hash')
-    redirectUrl.searchParams.delete('type')
-    redirectUrl.searchParams.delete('code')
-    redirectUrl.searchParams.delete('next')
-
-    const redirect = NextResponse.redirect(redirectUrl)
+    const redirect = NextResponse.redirect(publicUrl(request, destination))
     response.cookies.getAll().forEach((cookie) => {
       redirect.cookies.set(cookie.name, cookie.value)
     })
@@ -66,8 +60,7 @@ export async function GET(request: NextRequest) {
   }
 
   // If something went wrong, redirect to login with error
-  const redirectUrl = request.nextUrl.clone()
-  redirectUrl.pathname = '/auth/login'
+  const redirectUrl = publicUrl(request, '/auth/login')
   redirectUrl.searchParams.set('error', 'Could not verify email link. It may have expired.')
   return NextResponse.redirect(redirectUrl)
 }
