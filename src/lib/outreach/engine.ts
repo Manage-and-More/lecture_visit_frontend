@@ -3,7 +3,7 @@ import type {
   EmailMessage, MailSettings, ProfessorOutreach, ReplyClassification,
 } from '@/types/database'
 import { classifyReply, ClassificationRefusedError } from './classify'
-import { cleanLectureTitle, findUnfilled, lecturePhrase, render, salutationName, templateFor, type TemplateKind } from './templates'
+import { cleanLectureTitle, findUnfilled, lecturePhrase, render, replySubject, salutationName, templateFor, type TemplateKind } from './templates'
 
 type Db = SupabaseClient
 
@@ -315,7 +315,7 @@ async function queueTemplatedReply(
     kind,
     status: 'queued',
     to_emails: [addressOf(inbound.from_email ?? ctx.outreach.to_email)],
-    subject: `Re: ${inbound.subject || subject}`,
+    subject: replySubject(inbound.subject || subject),
     body,
     reply_to_gmail_message_id: inbound.gmail_message_id,
     queued_at: new Date().toISOString(),
@@ -474,7 +474,7 @@ export async function queueReplyTo(
 ): Promise<void> {
   const { data: outreach } = await db.from('professor_outreach')
     .select('to_email').eq('id', inbound.outreach_id).single()
-  const subject = inbound.subject.toLowerCase().startsWith('re:') ? inbound.subject : `Re: ${inbound.subject}`
+  const subject = replySubject(inbound.subject)
   const { error } = await db.from('email_messages').insert({
     outreach_id: inbound.outreach_id,
     direction: 'outbound',

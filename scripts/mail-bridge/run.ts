@@ -5,6 +5,9 @@
  *   npm run -s mail:bridge              send what the tool queued, pick up replies, process them
  *   npm run -s mail:bridge -- --check   only test the IMAP and SMTP login
  *   npm run -s mail:bridge -- --dry-run show what would be sent and which replies were found
+ *   npm run -s mail:bridge -- --test-to=me@example.org
+ *                                       in test mode, deliver to this address instead of the
+ *                                       sender's own (to test replies from an outside mailbox)
  *
  * Credentials: macOS Keychain entry "lecture-visit-tum-mail", account = TUM ID (e.g. ab12cde),
  * created once with:  security add-generic-password -s lecture-visit-tum-mail -a <TUM ID> -w
@@ -46,6 +49,7 @@ const FIRST_RUN_LOOKBACK_MS = 3 * 86400_000
 const args = new Set(process.argv.slice(2))
 const checkOnly = args.has('--check')
 const dryRun = args.has('--dry-run')
+const testTo = process.argv.slice(2).find(a => a.startsWith('--test-to='))?.slice('--test-to='.length).trim() || null
 
 function keychainCredentials(): { user: string; pass: string } {
   try {
@@ -82,6 +86,7 @@ async function main() {
   await imap.connect()
   await smtp.verify()
   console.log(`Logged in to ${IMAP_HOST} and ${SMTP_HOST} as ${user}; sending as ${from} (mode: ${settings.mode})`)
+  if (testTo && settings.mode !== 'test') throw new Error('--test-to only works while the sending mode is "test".')
   if (checkOnly) {
     await imap.logout()
     return
@@ -116,20 +121,22 @@ async function main() {
             threadKey = (parent?.gmail_thread_id as string | undefined) ?? inReplyTo
           }
           const messageId = `<${randomUUID()}@${domain}>`
+          const to = testTo ? [testTo] : item.to
+          const cc = testTo ? [] : item.cc
           const raw = await new MailComposer({
             from: { name: item.senderName, address: from },
-            to: item.to,
-            cc: item.cc.length ? item.cc : undefined,
+            to,
+            cc: cc.length ? cc : undefined,
             subject: item.subject,
             text: item.body,
             messageId,
             inReplyTo: inReplyTo ? bracket(inReplyTo) : undefined,
             references: inReplyTo ? [...new Set([threadKey, inReplyTo].filter(Boolean).map(id => bracket(id!)))] : undefined,
           }).compile().build()
-          await smtp.sendMail({ envelope: { from, to: [...item.to, ...item.cc] }, raw })
+          await smtp.sendMail({ envelope: { from, to: [...to, ...cc] }, raw })
           await imap.append(sentFolder, raw, ['\\Seen']).catch(e => console.warn(`Sent, but not filed in ${sentFolder}: ${e}`))
           sent.push({ id: item.id, ok: true, gmailMessageId: messageId, gmailThreadId: threadKey ?? messageId })
-          console.log(`Sent: ${item.subject} → ${item.to.join(', ')}`)
+          console.log(`Sent: ${item.subject} → ${to.join(', ')}`)
         } catch (e) {
           sent.push({ id: item.id, ok: false, error: e instanceof Error ? e.message : String(e) })
           console.error(`Failed: ${item.subject}: ${e}`)
