@@ -51,7 +51,7 @@ export function TargetFinder() {
     startQueueing(async () => {
       try {
         const { queued } = await queueOutreach([...selected], onlyMatching)
-        toast({ title: `${queued} emails queued`, description: 'They go out with the next check-ins, within the daily limit.' })
+        toast({ title: `${queued} emails queued`, description: 'They go out with the next runs of the mail bridge, within the daily limit.' })
         setResult(null)
         setSelected(new Set())
       } catch (error) {

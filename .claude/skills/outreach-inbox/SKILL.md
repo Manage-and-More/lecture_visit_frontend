@@ -5,10 +5,11 @@ description: Read and decide on lecturer replies to the lecture-visit outreach e
 
 # Outreach inbox
 
-The Lecture Visit tool emails lecturers from Gmail and stores their replies. No API key reads
-them automatically, so they are read here, in a Claude Code session, and the decisions are
-published back. Publishing can queue emails (thank-yous, answers), which go out with the next
-Gmail check-in.
+The Lecture Visit tool emails lecturers from the organiser's TUM mailbox and stores their
+replies. Mail moves through the local mail bridge (`npm run -s mail:bridge`, see
+scripts/mail-bridge/run.ts). No API key reads replies automatically, so they are read here, in a
+Claude Code session, and the decisions are published back. Publishing can queue emails
+(thank-yous, answers), which go out with the next run of the mail bridge.
 
 All commands run in the `lecture_visit_frontend` directory and need the Supabase service key,
 loaded from the scraper's env file:
@@ -18,6 +19,10 @@ set -a; source ../tum_scraper/.env; set +a
 ```
 
 ## Steps
+
+0. **Pick up new mail**: `npm run -s mail:bridge` (sends queued emails, stores new replies).
+   It reads the TUM login from the macOS Keychain; if it says there is none, tell the user the
+   one-time `security add-generic-password` command it prints.
 
 1. **Fetch** the unread replies (read-only):
    `npm run -s outreach:inbox` (optionally a maximum, e.g. `npm run -s outreach:inbox -- 50`).
@@ -36,7 +41,8 @@ set -a; source ../tum_scraper/.env; set +a
    the scratchpad, check it with `npm run -s outreach:apply -- <file> --dry-run`, then run it
    without `--dry-run`. Report the resulting thread statuses and how many emails were queued.
    Mention the sending mode it printed: in "off" mode queued emails wait, in "test" mode they
-   go to the sender's own address.
+   go to the sender's own address. Then run `npm run -s mail:bridge` once more so the queued
+   emails go out now (unless the user prefers to wait for the scheduled run).
 
 ## Reference
 

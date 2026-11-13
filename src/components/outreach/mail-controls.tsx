@@ -62,7 +62,7 @@ export function MailControls({ settings, sentLastDay, queuedCount, bridgeHealthy
       <CardHeader>
         <CardTitle>Sending</CardTitle>
         <CardDescription>
-          The Gmail script checks in every 5 minutes, sends up to {settings.per_run_cap} queued emails and reads new replies.
+          Emails go out from {settings.sender_email} through the TUM mail bridge on the organiser&apos;s Mac. Each run sends up to {settings.per_run_cap} queued emails and picks up new replies.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">
@@ -109,11 +109,11 @@ export function MailControls({ settings, sentLastDay, queuedCount, bridgeHealthy
             <dd className="text-lg font-semibold tabular-nums">{queuedCount}</dd>
           </div>
           <div className="rounded-lg bg-black/[0.03] p-3 col-span-2">
-            <dt className="text-muted-foreground text-xs">Gmail script</dt>
+            <dt className="text-muted-foreground text-xs">Mail bridge (TUM)</dt>
             <dd className="font-medium">
               {bridgeSeen
                 ? <span className={bridgeHealthy ? 'text-emerald-700' : 'text-amber-700'}>
-                    Last check-in {formatDateTime(settings.last_bridge_at)}{bridgeHealthy ? '' : ' (more than 15 minutes ago)'}
+                    Last run {formatDateTime(settings.last_bridge_at)}{bridgeHealthy ? '' : ' (more than 15 minutes ago)'}
                   </span>
                 : <span className="text-amber-700">Hasn&apos;t checked in yet</span>}
             </dd>
@@ -124,7 +124,7 @@ export function MailControls({ settings, sentLastDay, queuedCount, bridgeHealthy
           <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
             {unreadReplies} {unreadReplies === 1 ? 'reply is' : 'replies are'} waiting to be read.{' '}
             {aiReading
-              ? 'The AI reads them with the next check-in.'
+              ? 'The AI reads them with the next run of the mail bridge.'
               : <>Say &quot;process the outreach inbox&quot; in Claude Code, or open the threads marked &quot;Needs attention&quot; and decide by hand.</>}
           </div>
         )}
