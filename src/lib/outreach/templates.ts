@@ -41,6 +41,19 @@ export function lecturePhrase(titles: string[]): string {
   return `one of your lectures (${list})`
 }
 
+/** The test-mode marker the bridge puts in front of a subject ("[TEST an a@b.de] "). */
+const TEST_PREFIX_RE = /\[TEST an [^\]]*\]\s*/g
+
+/**
+ * Subject for an answer in a thread: "Re: " once, without the test-mode marker, so an answer
+ * to a test email doesn't carry the marker into the next email (where it would also look like
+ * an unfilled placeholder).
+ */
+export function replySubject(subject: string): string {
+  const clean = subject.replace(TEST_PREFIX_RE, '').replace(/^(\s*(re|aw|antw)\s*:\s*)+/i, '').trim()
+  return `Re: ${clean}`
+}
+
 /** Replaces {key} placeholders; unknown keys stay visible so they're caught before sending. */
 export function render(template: string, values: Record<string, string>): string {
   return template.replace(/\{([a-z_]+)\}/g, (match, key: string) => values[key] ?? match)

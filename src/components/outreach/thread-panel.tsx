@@ -159,7 +159,7 @@ export function ThreadPanel({ thread, onClose }: Props) {
             onClick={() => run(async () => { await queueManualReply(thread.id, reply); setReply('') }, 'Reply queued')}>
             Queue reply
           </Button>
-          <p className="text-xs text-muted-foreground">Goes out with the next check-in, as an answer in the lecturer&apos;s thread.</p>
+          <p className="text-xs text-muted-foreground">Goes out with the next run of the mail bridge, as an answer in the lecturer&apos;s thread.</p>
         </section>
       </div>
     </SidePanel>

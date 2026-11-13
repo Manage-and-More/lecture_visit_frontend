@@ -9,7 +9,8 @@
     "lint": "next lint",
     "outreach:inbox": "tsx scripts/outreach/inbox.ts",
     "outreach:apply": "tsx scripts/outreach/apply.ts",
-    "screening:score": "tsx scripts/screening/score.ts"
+    "screening:score": "tsx scripts/screening/score.ts",
+    "mail:bridge": "tsx scripts/mail-bridge/run.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.6.0",
@@ -38,12 +39,17 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@types/mailparser": "^3.9.0",
     "@types/node": "^20",
+    "@types/nodemailer": "^8.0.2",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "autoprefixer": "^10.4.27",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
+    "imapflow": "^2.11.0",
+    "mailparser": "^3.14.3",
+    "nodemailer": "^10.5.0",
     "postcss": "^8.5.6",
     "tailwindcss": "3.4.19",
     "tsx": "^4.23.15",
