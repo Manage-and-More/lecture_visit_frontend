@@ -48,12 +48,14 @@ export default async function HomePage() {
         ))}
       </ol>
 
-      {team.length > 0 && (
-        <section className="space-y-3">
+      <section className="space-y-3">
           <div className="flex items-baseline justify-between gap-3">
             <h2 className="text-lg font-semibold tracking-tight">Team availability</h2>
-            <span className="text-sm text-muted-foreground tabular-nums">{confirmed} of {team.length} confirmed</span>
+            {team.length > 0 && <span className="text-sm text-muted-foreground tabular-nums">{confirmed} of {team.length} confirmed</span>}
           </div>
+          {team.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Nobody has entered availability yet. Everyone with an account can add theirs under My availability.</p>
+          ) : (
           <ul className="divide-y rounded-lg border bg-white">
             {team.map(member => (
               <li key={member.name} className="flex items-center gap-3 px-4 py-2.5 text-sm">
@@ -64,15 +66,13 @@ export default async function HomePage() {
                 <span className={cn('ml-auto text-xs', member.status === 'confirmed' ? 'text-emerald-700' : 'text-muted-foreground')}>
                   {member.status === 'confirmed'
                     ? `Confirmed ${new Date(member.confirmedAt!).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', timeZone: 'Europe/Berlin' })}`
-                    : member.status === 'no_account'
-                      ? 'No account yet'
-                      : member.entries > 0 ? `${member.entries} ${member.entries === 1 ? 'time' : 'times'} entered, not confirmed` : 'Not confirmed'}
+                    : member.entries > 0 ? `${member.entries} ${member.entries === 1 ? 'time' : 'times'} entered, not confirmed` : 'Not confirmed'}
                 </span>
               </li>
             ))}
           </ul>
+          )}
         </section>
-      )}
     </div>
   )
 }

@@ -228,39 +228,45 @@ export async function loadCalendarWeek(
   return { semester, weekStart: weekStart.toISOString(), sessions, visits, members, truncated }
 }
 
-/** The current team (public.team_members) who have an account, with their weekly availability. */
+/**
+ * Everyone with an account can visit lectures. Members are the accounts that entered
+ * availability, confirmed it, or are assigned to a visit; accounts that did none of that
+ * don't matter for matching and would only crowd the pickers.
+ */
 export async function loadMembers(db: Db): Promise<CalendarMember[]> {
-  const { data: team } = await db.from('team_members').select('email, name')
-  const teamNames = new Map((team ?? []).map(t => [(t.email as string).toLowerCase(), t.name as string]))
-  if (teamNames.size === 0) return []
+  const slots = await fetchAll<{ profile_id: string; date: string; start_time: string; end_time: string; repeats_weekly: boolean; repeat_until: string | null }>((from, to) =>
+    db.from('member_availability').select('profile_id, date, start_time, end_time, repeats_weekly, repeat_until').range(from, to))
+  const { data: confirmations } = await db.from('availability_confirmations').select('profile_id')
+  const { data: visitRows } = await db.from('visits').select('assignee_ids').neq('status', 'cancelled')
 
-  const { data: profiles } = await db.from('profiles').select('id, email').in('email', [...teamNames.keys()])
-  const profileIds = (profiles ?? []).map(p => p.id as string)
-  const { data: slots } = profileIds.length
-    ? await db.from('member_availability').select('profile_id, date, start_time, end_time, repeats_weekly, repeat_until').in('profile_id', profileIds)
-    : { data: [] }
   const byProfile = new Map<string, Slot[]>()
-  for (const s of slots ?? []) {
-    const list = byProfile.get(s.profile_id as string) ?? []
+  for (const s of slots) {
+    const list = byProfile.get(s.profile_id) ?? []
     list.push({
-      date: s.date as string,
-      start: toMinutes(s.start_time as string),
-      end: toMinutes(s.end_time as string),
-      repeatsWeekly: s.repeats_weekly as boolean,
-      repeatUntil: (s.repeat_until as string | null) ?? null,
+      date: s.date,
+      start: toMinutes(s.start_time),
+      end: toMinutes(s.end_time),
+      repeatsWeekly: s.repeats_weekly,
+      repeatUntil: s.repeat_until ?? null,
     })
-    byProfile.set(s.profile_id as string, list)
+    byProfile.set(s.profile_id, list)
   }
-  const { data: confirmations } = profileIds.length
-    ? await db.from('availability_confirmations').select('profile_id').in('profile_id', profileIds)
-    : { data: [] }
   const confirmed = new Set((confirmations ?? []).map(c => c.profile_id as string))
-  return (profiles ?? [])
+  const ids = new Set<string>([...byProfile.keys(), ...confirmed])
+  for (const v of visitRows ?? []) for (const id of (v.assignee_ids as string[] | null) ?? []) ids.add(id)
+  if (ids.size === 0) return []
+
+  const profiles: { id: string; email: string | null; display_name: string | null }[] = []
+  for (const part of chunks([...ids])) {
+    const { data } = await db.from('profiles').select('id, email, display_name').in('id', part)
+    profiles.push(...((data ?? []) as typeof profiles))
+  }
+  return profiles
     .map(p => ({
-      id: p.id as string,
-      name: teamNames.get((p.email as string).toLowerCase()) ?? (p.email as string),
-      slots: byProfile.get(p.id as string) ?? [],
-      confirmed: confirmed.has(p.id as string),
+      id: p.id,
+      name: p.display_name?.trim() || p.email || 'Unknown',
+      slots: byProfile.get(p.id) ?? [],
+      confirmed: confirmed.has(p.id),
     }))
     .sort((a, b) => a.name.localeCompare(b.name, 'de'))
 }
