@@ -100,15 +100,6 @@ export type AvailabilityEntry = {
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 const TIME_RE = /^\d{2}:\d{2}$/
 
-/** Whether the signed-in user is on the current visit team (public.team_members). */
-export async function amIOnTheTeam(): Promise<boolean> {
-  const { supabase, userId } = await requireUser()
-  const { data: profile } = await supabase.from('profiles').select('email').eq('id', userId).single()
-  if (!profile?.email) return false
-  const { data } = await supabase.from('team_members').select('email').eq('email', (profile.email as string).toLowerCase()).maybeSingle()
-  return Boolean(data)
-}
-
 export async function getMyAvailability(): Promise<AvailabilityEntry[]> {
   const { supabase, userId } = await requireUser()
   const { data, error } = await supabase.from('member_availability')
@@ -189,37 +180,38 @@ export async function confirmMyAvailability(): Promise<void> {
 
 export type TeamStatus = {
   name: string
-  status: 'confirmed' | 'not_confirmed' | 'no_account'
+  status: 'confirmed' | 'not_confirmed'
   confirmedAt: string | null
   entries: number
 }
 
-/** The visit team and whether each member has committed their availability (shown on Home). */
+/**
+ * Who has entered or committed availability (shown on Home). Everyone with an account can
+ * take part; accounts without any entry aren't listed.
+ */
 export async function getTeamStatus(): Promise<TeamStatus[]> {
   const { supabase } = await requireUser()
-  const { data: team } = await supabase.from('team_members').select('email, name').order('name')
-  const emails = (team ?? []).map(t => (t.email as string).toLowerCase())
-  if (emails.length === 0) return []
-  const { data: profiles } = await supabase.from('profiles').select('id, email').in('email', emails)
-  const idByEmail = new Map((profiles ?? []).map(p => [(p.email as string).toLowerCase(), p.id as string]))
-  const ids = [...idByEmail.values()]
   const [{ data: confirmations }, { data: entries }] = await Promise.all([
-    ids.length ? supabase.from('availability_confirmations').select('profile_id, confirmed_at').in('profile_id', ids) : Promise.resolve({ data: [] }),
-    ids.length ? supabase.from('member_availability').select('profile_id').in('profile_id', ids) : Promise.resolve({ data: [] }),
+    supabase.from('availability_confirmations').select('profile_id, confirmed_at'),
+    supabase.from('member_availability').select('profile_id').limit(10000),
   ])
   const confirmedAt = new Map((confirmations ?? []).map(c => [c.profile_id as string, c.confirmed_at as string]))
   const entryCount = new Map<string, number>()
   for (const e of entries ?? []) entryCount.set(e.profile_id as string, (entryCount.get(e.profile_id as string) ?? 0) + 1)
-  return (team ?? []).map(t => {
-    const id = idByEmail.get((t.email as string).toLowerCase())
-    const at = id ? confirmedAt.get(id) ?? null : null
-    return {
-      name: t.name as string,
-      status: !id ? 'no_account' : at ? 'confirmed' : 'not_confirmed',
-      confirmedAt: at,
-      entries: id ? entryCount.get(id) ?? 0 : 0,
-    }
-  })
+  const ids = [...new Set([...confirmedAt.keys(), ...entryCount.keys()])]
+  if (ids.length === 0) return []
+  const { data: profiles } = await supabase.from('profiles').select('id, email, display_name').in('id', ids)
+  return (profiles ?? [])
+    .map(p => {
+      const at = confirmedAt.get(p.id as string) ?? null
+      return {
+        name: (p.display_name as string | null)?.trim() || (p.email as string | null) || 'Unknown',
+        status: at ? 'confirmed' as const : 'not_confirmed' as const,
+        confirmedAt: at,
+        entries: entryCount.get(p.id as string) ?? 0,
+      }
+    })
+    .sort((a, b) => Number(b.status === 'confirmed') - Number(a.status === 'confirmed') || a.name.localeCompare(b.name, 'de'))
 }
 
 export type MyVisit = { id: string; title: string; start: string; location: string | null; status: string; teammates: string[] }

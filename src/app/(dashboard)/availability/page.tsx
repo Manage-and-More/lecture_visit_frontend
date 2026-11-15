@@ -1,9 +1,9 @@
-import { amIOnTheTeam, getMyAvailability, getMyConfirmation, getMyVisits } from '@/app/actions/visit-planning'
+import { getMyAvailability, getMyConfirmation, getMyVisits } from '@/app/actions/visit-planning'
 import { ConfirmAvailability } from '@/components/availability/confirm-availability'
 import { AvailabilityCalendar } from '@/components/availability/availability-calendar'
 
 export default async function AvailabilityPage() {
-  const [entries, visits, onTeam, confirmedAt] = await Promise.all([getMyAvailability(), getMyVisits(), amIOnTheTeam(), getMyConfirmation()])
+  const [entries, visits, confirmedAt] = await Promise.all([getMyAvailability(), getMyVisits(), getMyConfirmation()])
 
   return (
     <div className="animate-fade-in-up space-y-6">
@@ -13,11 +13,6 @@ export default async function AvailabilityPage() {
           Add the times you can visit a lecture, on single days or repeating every week.
         </p>
       </div>
-      {!onTeam && (
-        <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-          You&apos;re not on the current visit team, so visits won&apos;t be planned for you. Ask an admin to add you.
-        </p>
-      )}
       <ConfirmAvailability confirmedAt={confirmedAt} hasEntries={entries.length > 0} />
       <AvailabilityCalendar entries={entries} />
       <section className="rounded-lg border bg-white p-4 text-sm space-y-2">
