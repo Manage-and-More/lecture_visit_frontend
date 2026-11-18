@@ -104,7 +104,7 @@ export async function GET(request: NextRequest) {
     )
   } else {
     csv = toCsv(
-      ['university', 'number', 'title', 'type', 'semester', 'target', 'score', 'lecturers', 'lecturer_emails', 'sessions', 'programs', 'mandatory_in', 'source_url'],
+      ['university', 'number', 'title', 'type', 'semester', 'target', 'est_audience', 'lecturers', 'lecturer_emails', 'sessions', 'programs', 'mandatory_in', 'source_url'],
       selected.map(l => {
         const profs = l.lecture_professors.map(lp => lp.professor).filter((p): p is NonNullable<typeof p> => Boolean(p))
         const programs = [...new Set(l.lecture_study_programs.filter(p => p.program).map(p => shortProgramName(p.program!.name)))]
@@ -114,7 +114,7 @@ export async function GET(request: NextRequest) {
           cleanLectureType(l.lecture_type),
           l.semester,
           targets.has(l.id) ? 'yes' : 'no',
-          scores.get(l.id)?.toFixed(1) ?? '',
+          scores.has(l.id) ? String(Math.round(scores.get(l.id)!)) : '',
           profs.map(name).join('; '),
           profs.map(p => p.email).filter(Boolean).join('; '),
           l.lecture_schedules.map(s => [s.day_time, s.date_range, s.location].filter(Boolean).join(' | ')).join('; '),

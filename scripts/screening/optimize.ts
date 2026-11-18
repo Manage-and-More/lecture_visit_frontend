@@ -4,19 +4,20 @@
  *
  *   npm run -s screening:optimize -- [--visits=20] [--university=all|TUM|LMU]
  *       [--semester="WiSe 2026/27"] [--csv=/path/out.csv] [--include-past]
- *       [--min=LMU:10,TUM:10] [--registrations=file.json] [--rooms=file.json]
+ *       [--min=LMU:10,TUM:10] [--registrations=file.json] [--rooms=file.json] [--lmu-sections=file.csv]
  *
  * Only lectures with at least one lecturer email and (unless --include-past) a session left.
  * Needs SUPABASE_URL / SUPABASE_SERVICE_KEY (../tum_scraper/.env is loaded automatically).
  */
 import '../mail-bridge/load-env'
 import '../outreach/env'
-import { readFileSync, writeFileSync } from 'node:fs'
+import { writeFileSync } from 'node:fs'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { extrapolateDates } from '@/lib/date-utils'
-import { DEFAULT_PARAMS, optimize, type OptLecture } from '@/lib/screening/optimize'
+import { DEFAULT_PARAMS, optimize } from '@/lib/screening/optimize'
 import { cleanLectureType, truncateLabel } from '@/lib/screening/score'
 import type { LectureSchedule } from '@/types/database'
+import { attachAudienceData, defaultDataPaths, type DataLecture } from './audience-data'
 
 const arg = (name: string) => process.argv.slice(2).find(a => a.startsWith(`--${name}=`))?.split('=').slice(1).join('=')
 const visits = Number(arg('visits') ?? DEFAULT_PARAMS.visits)
@@ -25,42 +26,14 @@ const semester = arg('semester') ?? 'WiSe 2026/27'
 const csvPath = arg('csv')
 const includePast = process.argv.includes('--include-past')
 // Registered students per lecture (TUMonline), as {lecture_id: count}; optional
-const registrationsPath = arg('registrations')
+// Defaults: ../lecture_visit_data/<semester>/ and ../lmu_scraper/data/<semester>/ (see audience-data.ts)
+const defaults = defaultDataPaths(semester)
+const registrationsPath = arg('registrations') ?? defaults.registrations
 // Seats per room location string, as {location: seats}; optional (LMU rooms)
-const roomsPath = arg('rooms')
+const roomsPath = arg('rooms') ?? defaults.rooms
 // LMU lecture list with faculties (lmu_scraper data/<semester>/lecture_sections.csv); optional
-const sectionsPath = arg('lmu-sections')
+const sectionsPath = arg('lmu-sections') ?? defaults.sections
 
-/**
- * LMU students per faculty, from the official subject-group totals of WiSe 2024/25
- * (Bayerisches Landesamt für Statistik, B3110C 202422, table 3.1), split evenly over the
- * faculties of each group. Psychology and education count as social sciences, informatics
- * as engineering, as in the official classification.
- */
-const LMU_FACULTY_POOL: Record<string, number> = (() => {
-  const groups: [number, string[]][] = [
-    [12968, ['Katholisch-Theologische Fakultät', 'Evangelisch-Theologische Fakultät', 'Fakultät für Philosophie, Wissenschaftstheorie und Religionswissenschaft',
-      'Fakultät für Geschichts- und Kunstwissenschaften', 'Fakultät für Sprach- und Literaturwissenschaften', 'Fakultät für Kulturwissenschaften']],
-    [16721, ['Juristische Fakultät', 'Fakultät für Betriebswirtschaft', 'Volkswirtschaftliche Fakultät', 'Sozialwissenschaftliche Fakultät', 'Fakultät für Psychologie und Pädagogik']],
-    [10018, ['Fakultät für Mathematik, Informatik und Statistik', 'Fakultät für Physik', 'Fakultät für Chemie und Pharmazie', 'Fakultät für Biologie', 'Fakultät für Geowissenschaften']],
-    [7203, ['Medizinische Fakultät']],
-    [1876, ['Tierärztliche Fakultät']],
-  ]
-  const pool: Record<string, number> = {}
-  for (const [total, faculties] of groups) for (const f of faculties) pool[f] = total / faculties.length
-  pool['Fakultät für Mathematik, Informatik und Statistik'] += 3544 // engineering group = informatics
-  pool['Fakultät für Geschichts- und Kunstwissenschaften'] += 1279 // arts group
-  return pool
-})()
-
-function readFaculties(path: string): Map<string, string> {
-  const map = new Map<string, string>()
-  for (const line of readFileSync(path, 'utf8').split('\n').slice(1)) {
-    const m = line.match(/^(\d+),(?:"(?:[^"]|"")*"|[^,]*),("(?:[^"]|"")*"|[^,]*),/)
-    if (m) map.set(String(Number(m[1])), m[2].replace(/^"|"$/g, '').replace(/""/g, '"'))
-  }
-  return map
-}
 // Minimum visits per university, e.g. --min=LMU:10,TUM:10
 const minPerUniversity = Object.fromEntries((arg('min') ?? '').split(',').filter(Boolean)
   .map(x => x.split(':')).map(([u, n]) => [u, Number(n)]))
@@ -86,7 +59,7 @@ async function main() {
   }
   const soon = new Date(); soon.setDate(soon.getDate() + 2)
   const counts = { all: rows.length, email: 0, sessions: 0 }
-  const lectures: (OptLecture & { next: string | null; sessions: number; locations: string[]; externalId: string | null })[] = []
+  const lectures: (DataLecture & { next: string | null; sessions: number })[] = []
   for (const r of rows) {
     if (university !== 'all' && r.university?.name !== university) continue
     if (!r.lecture_professors.some(lp => lp.professor?.email?.trim())) continue
@@ -104,32 +77,7 @@ async function main() {
     })
   }
 
-  if (registrationsPath) {
-    const reg = JSON.parse(readFileSync(registrationsPath, 'utf8')) as Record<string, number>
-    let known = 0
-    for (const l of lectures) { const n = reg[l.id]; if (typeof n === 'number') { l.registered = n; known++ } }
-    console.log(`Registration counts for ${known} of ${lectures.length} lectures`)
-  }
-  if (sectionsPath) {
-    const faculties = readFaculties(sectionsPath)
-    let known = 0
-    for (const l of lectures) {
-      if (l.university !== 'LMU' || !l.externalId) continue
-      const faculty = faculties.get(String(Number(l.externalId)))
-      const size = faculty ? LMU_FACULTY_POOL[faculty] : undefined
-      if (faculty && size) { l.pool = { key: `LMU ${faculty}`, size }; known++ }
-    }
-    console.log(`Faculty for ${known} LMU lectures`)
-  }
-  if (roomsPath) {
-    const seats = JSON.parse(readFileSync(roomsPath, 'utf8')) as Record<string, unknown>
-    let known = 0
-    for (const l of lectures) {
-      const sizes = l.locations.map(loc => seats[loc]).filter((n): n is number => typeof n === 'number' && n > 0)
-      if (sizes.length) { l.roomSeats = Math.max(...sizes); known++ }
-    }
-    console.log(`Room size for ${known} of ${lectures.length} lectures`)
-  }
+  attachAudienceData(lectures, { registrations: registrationsPath, rooms: roomsPath, sections: sectionsPath })
   const t0 = Date.now()
   const result = optimize(lectures, { visits, winter: semester.startsWith('WiSe'), minPerUniversity })
   const ms = Date.now() - t0

@@ -13,7 +13,7 @@ import { cn } from '@/lib/utils'
 
 const MAX_CHIPS = 5
 
-export function LectureScreening({ canEdit }: { canEdit: boolean }) {
+export function LectureScreening({ canEdit, locked }: { canEdit: boolean; locked: boolean }) {
   const { toast } = useToast()
   const [filters, setFilters] = useState<ScreeningFilters>({
     search: '', university: 'all', onlyVorlesung: true, onlyWithEmail: true, onlyTargets: false, page: 0,
@@ -70,7 +70,9 @@ export function LectureScreening({ canEdit }: { canEdit: boolean }) {
           </div>
         )}
       </div>
-      {!canEdit && (
+      {locked ? (
+        <p className="text-xs text-muted-foreground">The target list is locked and can&apos;t be changed here.</p>
+      ) : !canEdit && (
         <p className="text-xs text-muted-foreground">The target list is shared by the whole team. Admins choose the targets.</p>
       )}
 
@@ -151,7 +153,7 @@ export function LectureScreening({ canEdit }: { canEdit: boolean }) {
                       </div>
                     </td>
                     <td className="px-3 py-3">
-                      <div className="font-semibold tabular-nums" title={row.reasons.join('\n')}>{row.score.toFixed(1)}</div>
+                      <div className="font-semibold tabular-nums" title={row.reasons.join('\n')}>{row.score > 0 ? `≈ ${Math.round(row.score).toLocaleString('en-US')}` : '–'}</div>
                       <div className="mt-1 text-[11px] leading-snug text-muted-foreground line-clamp-2" title={row.reasons.join('\n')}>{row.reasons[0]}</div>
                     </td>
                     <td className="px-3 py-3">
@@ -182,7 +184,7 @@ export function LectureScreening({ canEdit }: { canEdit: boolean }) {
               })}
               {data.rows.length === 0 && (
                 <tr><td colSpan={4} className="px-3 py-6 text-center text-muted-foreground">
-                  {filters.onlyTargets ? 'No target lectures yet. Tick lectures under "All lectures" to add them.' : 'No lectures match these filters.'}
+                  {filters.onlyTargets ? (locked ? 'No target lectures match these filters.' : 'No target lectures yet. Tick lectures under "All lectures" to add them.') : 'No lectures match these filters.'}
                 </td></tr>
               )}
             </tbody>
@@ -196,7 +198,7 @@ export function LectureScreening({ canEdit }: { canEdit: boolean }) {
           <span className="tabular-nums">Page {filters.page + 1} of {pages} · {data.total} lectures</span>
           <Button size="sm" variant="outline" disabled={filters.page + 1 >= pages || isLoading} onClick={() => update({ page: filters.page + 1 })} aria-label="Next page"><ChevronRight /></Button>
           <span className="ml-auto text-xs text-muted-foreground">
-            Green: mandatory in that program · grey: already reached by a target lecture · number: recommended semester
+            Est. audience: students per session (60% of TUMonline registrations, or 60% of the room&apos;s seats, else estimated from programs) · green: mandatory · grey: already reached by a target · number: recommended semester
           </span>
         </div>
       )}
