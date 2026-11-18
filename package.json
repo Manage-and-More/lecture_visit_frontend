@@ -10,7 +10,8 @@
     "outreach:inbox": "tsx scripts/outreach/inbox.ts",
     "outreach:apply": "tsx scripts/outreach/apply.ts",
     "screening:score": "tsx scripts/screening/score.ts",
-    "mail:bridge": "tsx scripts/mail-bridge/run.ts"
+    "mail:bridge": "tsx scripts/mail-bridge/run.ts",
+    "screening:optimize": "tsx scripts/screening/optimize.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.6.0",
