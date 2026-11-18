@@ -35,8 +35,8 @@ export type LectureScore = {
   inLectureHall: boolean
 }
 
-const TEACHING_RE = /lehramt|teacher|teaching|unterrichtsfach|didaktikfach|berufliche bildung|gymnasi|realschul|grundschul|mittelschul|of education|\b[BM]\.\s?Ed\b|\bsubject\b/i
-const MINOR_RE = /nebenfach|\bminor\b|\bNF\b|exchange|austausch|certificate|zertifikat|graduate studies|skills excellence/i
+export const TEACHING_RE = /lehramt|teacher|teaching|unterrichtsfach|didaktikfach|berufliche bildung|gymnasi|realschul|grundschul|mittelschul|of education|\b[BM]\.\s?Ed\b|\bsubject\b/i
+export const MINOR_RE = /nebenfach|\bminor\b|\bNF\b|exchange|austausch|certificate|zertifikat|graduate studies|skills excellence/i
 const HALL_RE = /hörsaal|hoersaal|audimax|\bHS\s?\d|\bHS\b|\baula\b|interims/i
 
 const MAX_LABEL = 56
