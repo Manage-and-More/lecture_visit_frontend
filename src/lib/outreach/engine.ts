@@ -10,6 +10,8 @@ type Db = SupabaseClient
 /** Statuses whose Gmail threads the bridge keeps watching for replies. */
 const WATCHED_STATUSES = ['awaiting_reply', 'interested', 'needs_attention', 'scheduled', 'declined']
 const LEASE_TIMEOUT_MINUTES = 30
+/** A reminder is only sent while the proposed visit is at least this many days away. */
+const FOLLOWUP_MIN_LEAD_DAYS = 2
 export const NEW_REPLY_REASON = 'New reply, not read yet'
 
 /** Replies are read by the Claude API only when a key is configured; otherwise in a Claude Code session. */
@@ -83,6 +85,35 @@ async function loadContext(db: Db, outreachId: string): Promise<OutreachContext>
   return { outreach: rest as ProfessorOutreach, professor, lectureTitles }
 }
 
+const VISIT_WEEKDAY = new Intl.DateTimeFormat('en-GB', { weekday: 'long', timeZone: 'Europe/Berlin' })
+const VISIT_DAY_MONTH = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'long', timeZone: 'Europe/Berlin' })
+const VISIT_CLOCK = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Europe/Berlin' })
+const BERLIN_DAY = new Intl.DateTimeFormat('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'Europe/Berlin' })
+
+export type PlannedVisit = { id: string; start: Date; status: string; lectureTitle: string }
+
+/** The planned (or confirmed) visit of an outreach thread, if one is linked. */
+export async function plannedVisitOf(db: Db, outreachId: string): Promise<PlannedVisit | null> {
+  const { data } = await db.from('visits')
+    .select('id, scheduled_for, status, lecture:lectures(title)')
+    .eq('outreach_id', outreachId).in('status', ['planned', 'confirmed'])
+    .not('scheduled_for', 'is', null)
+    .order('scheduled_for').limit(1).maybeSingle()
+  if (!data) return null
+  const row = data as unknown as { id: string; scheduled_for: string; status: string; lecture: { title: string } | null }
+  return { id: row.id, start: new Date(row.scheduled_for), status: row.status, lectureTitle: row.lecture?.title ?? '' }
+}
+
+/** "Thursday, 3 December", "3 December", "10:00", "2026-12-03" (Berlin time). */
+export function visitDateValues(start: Date) {
+  return {
+    visit_date: `${VISIT_WEEKDAY.format(start)}, ${VISIT_DAY_MONTH.format(start)}`,
+    visit_date_short: VISIT_DAY_MONTH.format(start),
+    visit_time: VISIT_CLOCK.format(start),
+    visit_day_key: BERLIN_DAY.format(start),
+  }
+}
+
 /** Builds the text of a templated email (everything except manual replies). */
 export async function renderTemplated(
   db: Db, settings: MailSettings, outreachId: string, kind: TemplateKind,
@@ -101,7 +132,10 @@ export async function renderTemplated(
       .maybeSingle()
     originalMessage = data?.body ?? ''
   }
+  // The email proposes the planned visit; without one, {visit_*} stay unfilled and block sending
+  const visit = await plannedVisitOf(db, outreachId)
   const values = {
+    ...(visit ? { ...visitDateValues(visit.start), lecture_title: cleanLectureTitle(visit.lectureTitle) } : {}),
     salutation_name: salutationName(ctx.professor),
     sender_name: settings.sender_name,
     lecture_phrase: lecturePhrase(ctx.lectureTitles),
@@ -362,8 +396,25 @@ export async function applyClassification(
     }
   } else if ((c.category === 'yes' || c.category === 'no') && !reviewFirst) {
     const anyYes = c.category === 'yes' || c.lecture_decisions.some(d => d.decision === 'yes')
+    // The request proposed a date: a yes that names another date or adds conditions needs a person
+    const visit = anyYes ? await plannedVisitOf(db, ctx.outreach.id) : null
+    const otherDate = visit && c.mentioned_dates.find(d => d !== visitDateValues(visit.start).visit_day_key)
+    if (visit && (otherDate || c.conditions)) {
+      await setResponses(c.category)
+      await db.from('professor_outreach').update({
+        ...update,
+        status: 'needs_attention',
+        attention_reason: otherDate ? `Yes, but mentions another date (${otherDate}) than the planned visit` : `Yes, with conditions: ${c.conditions}`,
+      }).eq('id', ctx.outreach.id)
+      return
+    }
     await setResponses(c.category)
     if (ctx.outreach.status !== 'scheduled') update.status = anyYes ? 'interested' : 'declined'
+    if (visit) {
+      // The thank-you confirms the proposed date, so the visit is settled
+      await db.from('visits').update({ status: 'confirmed', updated_at: now }).eq('id', visit.id)
+      update.status = 'scheduled'
+    }
     update.attention_reason = null
     // A reply written for this email replaces the automatic thank-you
     if (!options.skipAutoReply) {
@@ -450,6 +501,9 @@ export async function queueFollowups(db: Db, settings: MailSettings): Promise<nu
     const answered = (replies ?? []).some(r =>
       (r.classification as ReplyClassification | null)?.category !== 'out_of_office')
     if (answered) continue
+    // A reminder needs time before the proposed visit; without a visit it can't name a date
+    const visit = await plannedVisitOf(db, outreach.id)
+    if (!visit || visit.start.getTime() - Date.now() < FOLLOWUP_MIN_LEAD_DAYS * 86400_000) continue
     const { error } = await db.from('email_messages').insert({
       outreach_id: outreach.id,
       direction: 'outbound',

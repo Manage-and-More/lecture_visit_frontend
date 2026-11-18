@@ -1,6 +1,4 @@
 /**
- * Parts of the app that are switched off for now. Set to true to bring them back.
- * Outreach is paused while the team screens lectures and enters availability; the Gmail
- * bridge keeps running but has nothing to send.
+ * Parts of the app that can be switched off. Set to false to hide them again.
  */
-export const OUTREACH_ENABLED = false
+export const OUTREACH_ENABLED = true

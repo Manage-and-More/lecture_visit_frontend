@@ -21,12 +21,14 @@ export function salutationName(p: ProfessorName): string {
 
 /**
  * Lecture title as a lecturer would say it: without TUM module codes such as "[MA0003]" or
- * "(MGT001365, englisch)" at the end.
+ * "(MGT001365, englisch)" at the end, nor catalogue details such as "(6 ECTS/mit Übungen)",
+ * "(Lehramt Realschule, …)" or an all-caps abbreviation such as "(CAMPP)".
  */
 export function cleanLectureTitle(title: string): string {
   return title
     .replace(/\s*\[[^\]]*\]\s*$/, '')
     .replace(/\s*\([^)]*[A-Z]{2,}\d{3,}[^)]*\)\s*$/, '')
+    .replace(/\s*\((?:[^)]*\bECTS\b[^)]*|Lehramt[^)]*|[A-ZÄÖÜ]{4,})\)\s*$/, '')
     .trim() || title
 }
 
