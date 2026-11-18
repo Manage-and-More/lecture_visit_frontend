@@ -45,6 +45,11 @@ const IMAP_HOST = 'xmail.mwn.de'
 const SMTP_HOST = 'postout.lrz.de'
 const STATE_FILE = path.join(os.homedir(), '.config', 'lecture-visit', 'mail-bridge.json')
 const OVERLAP_MS = 15 * 60_000
+/** Pause between two emails of a run: 10 s with a random ±3 s, so sending doesn't look like a burst */
+const SEND_GAP_MS = 10_000
+const SEND_JITTER_MS = 3_000
+const sendGap = () => SEND_GAP_MS + (Math.random() * 2 - 1) * SEND_JITTER_MS
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 const FIRST_RUN_LOOKBACK_MS = 3 * 86400_000
 
 const args = new Set(process.argv.slice(2))
@@ -104,7 +109,12 @@ async function main() {
       const { outbox, blocked } = await leaseOutbox(db, settings)
       blocked.forEach(b => console.log(`Blocked: ${b}`))
       const sentFolder = (await imap.list()).find(f => f.specialUse === '\\Sent')?.path ?? 'Sent Items'
-      for (const item of outbox) {
+      for (const [index, item] of outbox.entries()) {
+        if (index > 0) {
+          const gap = sendGap()
+          console.log(`Waiting ${(gap / 1000).toFixed(1)} s before the next email`)
+          await sleep(gap)
+        }
         try {
           const { data: row } = await db.from('email_messages').select('outreach_id').eq('id', item.id).single()
           // Thread headers: answer the lecturer's email, or a reminder answers our first email
