@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { activeSemester, requireAdmin, requireUser } from '@/lib/auth'
 import { extrapolateDates } from '@/lib/date-utils'
 import { cleanLectureType, shortProgramName } from '@/lib/screening/score'
+import { TARGET_LIST_LOCKED } from '@/lib/screening/target-lock'
 import type { LectureSchedule } from '@/types/database'
 
 export type ScreeningFilters = {
@@ -151,6 +152,7 @@ export async function getScreeningPage(filters: ScreeningFilters): Promise<Scree
 /** Adds a lecture to the shared target list, or removes it. Outreach takes its lectures from this list. */
 export async function setLectureTarget(lectureId: string, target: boolean): Promise<void> {
   const { supabase, userId } = await requireAdmin()
+  if (TARGET_LIST_LOCKED) throw new Error('The target list is locked and can no longer be changed.')
   const { error } = target
     ? await supabase.from('target_lectures').upsert({ lecture_id: lectureId, added_by: userId }, { onConflict: 'lecture_id', ignoreDuplicates: true })
     : await supabase.from('target_lectures').delete().eq('lecture_id', lectureId)

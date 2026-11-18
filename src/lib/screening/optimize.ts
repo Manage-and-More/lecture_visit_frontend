@@ -230,6 +230,39 @@ export function buildModel(lectures: OptLecture[], p: OptimizeParams) {
   return { cohorts: cohortList, reach }
 }
 
+export type AudienceEstimate = {
+  /** Expected students in one session */
+  attendees: number
+  basis: 'registrations' | 'room' | 'programs' | 'none'
+  /** Short explanation for the UI, e.g. "2,286 registered in TUMonline" */
+  detail: string
+}
+
+/**
+ * Expected students in one session of each lecture, with what the number is based on:
+ * registered students * registeredShowUp (TUMonline), else room seats * roomFill (Vorlesungen
+ * only), else the program-based model estimate (at most unknownAudienceCap), else nothing.
+ */
+export function estimateAudiences(lectures: OptLecture[], params: Partial<OptimizeParams> = {}): Map<string, AudienceEstimate> {
+  const p = { ...DEFAULT_PARAMS, ...params }
+  const fmt = (n: number) => n.toLocaleString('en-US')
+  const modelled = new Map(buildModel(lectures, p).reach.map(r => [r.lecture.id, r.weight]))
+  const result = new Map<string, AudienceEstimate>()
+  for (const l of lectures) {
+    const isLecture = typeWeight(l.lectureType, p) > 0
+    if (l.registered && l.registered > 0) {
+      result.set(l.id, { attendees: Math.round(l.registered * p.registeredShowUp), basis: 'registrations', detail: `${fmt(l.registered)} registered in TUMonline` })
+    } else if (isLecture && l.roomSeats && l.roomSeats > 0) {
+      result.set(l.id, { attendees: Math.round(l.roomSeats * p.roomFill), basis: 'room', detail: `Room with ${fmt(l.roomSeats)} seats` })
+    } else if (modelled.has(l.id)) {
+      result.set(l.id, { attendees: Math.round(modelled.get(l.id)!), basis: 'programs', detail: 'Estimate from study programs' })
+    } else {
+      result.set(l.id, { attendees: 0, basis: 'none', detail: 'No registration, room or program data' })
+    }
+  }
+  return result
+}
+
 export function optimize(lectures: OptLecture[], params: Partial<OptimizeParams> = {}): OptimizeResult {
   const p = { ...DEFAULT_PARAMS, ...params }
   const { cohorts, reach } = buildModel(lectures, p)
