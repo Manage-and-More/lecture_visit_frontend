@@ -3,7 +3,7 @@
  * Prints the plan, optionally writes a CSV; --apply saves it as planned visits.
  *
  *   npm run -s visits:assign -- [--until=2026-12-03] [--from=YYYY-MM-DD] [--max-per-person=2]
- *       [--max-per-day=1] [--window=30] [--csv=/path/out.csv] [--apply]
+ *       [--max-per-day=1] [--window=30] [--csv=/path/out.csv] [--apply] [--ignore-existing]
  *
  * --from defaults to the day after tomorrow (notice for the lecturer); --window is how many
  * minutes from the start of the session a member must be free. Only confirmed availability
@@ -30,6 +30,8 @@ const maxPerDay = Number(arg('max-per-day') ?? 1)
 const windowMinutes = Number(arg('window') ?? 30)
 const csvPath = arg('csv')
 const apply = process.argv.includes('--apply')
+// Plan from scratch, as if no visits existed (e.g. to compare with the saved plan); not with --apply
+const ignoreExisting = process.argv.includes('--ignore-existing')
 
 async function main() {
   const db = createAdminClient()
@@ -43,7 +45,8 @@ async function main() {
   const audience = new Map((scores ?? []).map(s => [s.lecture_id as string, Number(s.score)]))
 
   // Existing visits: their lectures are done, their members partly used up
-  const { data: existing } = await db.from('visits').select('lecture_id, scheduled_for, assignee_ids, status')
+  if (apply && ignoreExisting) throw new Error('--ignore-existing is for comparing plans; it cannot be combined with --apply')
+  const { data: existing } = ignoreExisting ? { data: [] } : await db.from('visits').select('lecture_id, scheduled_for, assignee_ids, status')
     .in('status', ['planned', 'confirmed', 'done'])
   const alreadyVisited = new Set((existing ?? []).map(v => v.lecture_id as string))
   const used = new Map<string, number>()
