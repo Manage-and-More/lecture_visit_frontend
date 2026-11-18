@@ -104,6 +104,9 @@ export async function queueOutreach(professorIds: string[], onlyMatching: boolea
     await supabase.from('outreach_lectures').insert(
       candidate.lectures.map((l, position) => ({ outreach_id: outreach.id, lecture_id: l.id, position })),
     )
+    // The email proposes the planned visit's date; the link also lets a yes confirm it
+    await supabase.from('visits').update({ outreach_id: outreach.id, updated_at: new Date().toISOString() })
+      .in('lecture_id', candidate.lectures.map(l => l.id)).in('status', ['planned', 'confirmed']).is('outreach_id', null)
     await supabase.from('email_messages').insert({
       outreach_id: outreach.id,
       direction: 'outbound',

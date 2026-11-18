@@ -72,7 +72,8 @@ function displayName(p: ProfessorRow): string {
 
 /**
  * Lecturers to email this semester: the target lectures chosen on the Lectures page (the
- * shared list) that still have sessions left and, if asked, a session where a team member
+ * shared list) that have a planned visit nobody asked the lecturer about yet, still have
+ * sessions left and, if asked, a session where a team member
  * with confirmed availability is free. One candidate per lecturer, who gets one email
  * covering all their target lectures.
  */
@@ -104,6 +105,10 @@ export async function findTargets(
     lectures.push(...((data ?? []) as unknown as LectureRow[]))
   }
 
+  // Visits are planned first; a lecturer is only asked for the date of a planned visit
+  const { data: visitRows } = await db.from('visits').select('lecture_id').in('status', ['planned', 'confirmed']).is('outreach_id', null)
+  const plannedLectures = new Set((visitRows ?? []).map(v => v.lecture_id as string))
+
   const { data: optedOutRows } = await db.from('do_not_contact').select('email')
   const optedOut = new Set((optedOutRows ?? []).map(r => r.email as string))
   const { data: existingRows } = await db.from('professor_outreach')
@@ -117,6 +122,10 @@ export async function findTargets(
   for (const lecture of lectures) {
     const upcoming = extrapolateDates(lecture.schedules, 0, 20).filter(d => d.date >= soon)
     const hasSchedule = lecture.schedules.some(s => s.day_time)
+    if (!plannedLectures.has(lecture.id)) {
+      skip('No visit planned (or the lecturer was already asked)')
+      continue
+    }
     if (hasSchedule && upcoming.length === 0) {
       skip('No sessions left this semester')
       continue
@@ -175,6 +184,9 @@ export async function findTargets(
       match: matching[0] ? { label: matching[0].session.label, members: matching[0].free.map(m => m.name) } : null,
       matchingSessions: matching.length,
     })
+    if (candidate.lectures.length > 1 && !candidate.warnings.some(w => w.startsWith('Several'))) {
+      candidate.warnings.push('Several target lectures: the email proposes the earliest planned visit only')
+    }
     if (!hasSchedule && !candidate.warnings.includes('A lecture has no schedule')) {
       candidate.warnings.push('A lecture has no schedule')
     }
