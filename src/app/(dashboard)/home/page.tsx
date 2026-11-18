@@ -1,6 +1,6 @@
 import Link from 'next/link'
-import { CheckCircle2, CircleDashed } from 'lucide-react'
-import { getTeamStatus } from '@/app/actions/visit-planning'
+import { CalendarCheck, CheckCircle2, CircleDashed } from 'lucide-react'
+import { getMyVisits, getTeamStatus } from '@/app/actions/visit-planning'
 import { cn } from '@/lib/utils'
 import { OUTREACH_ENABLED } from '@/lib/features'
 
@@ -12,9 +12,12 @@ const STEPS = [
   { title: 'Run the outreach', href: '/outreach', disabled: !OUTREACH_ENABLED },
 ]
 
-/** First page after signing in: the workflow in four steps, and who has committed their availability. */
+const VISIT_DAY = new Intl.DateTimeFormat('en-GB', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Europe/Berlin' })
+const VISIT_TIME = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Europe/Berlin' })
+
+/** First page after signing in: your own visits, the workflow in four steps, and who has committed their availability. */
 export default async function HomePage() {
-  const team = await getTeamStatus()
+  const [team, myVisits] = await Promise.all([getTeamStatus(), getMyVisits()])
   const confirmed = team.filter(t => t.status === 'confirmed').length
 
   return (
@@ -23,6 +26,30 @@ export default async function HomePage() {
         <h1 className="text-balance text-3xl font-semibold tracking-tight">Plan lecture visits</h1>
         <p className="text-muted-foreground">For Manage and More, at TUM and LMU.</p>
       </div>
+
+      {myVisits.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="text-lg font-semibold tracking-tight">Your lecture visits</h2>
+          <ul className="space-y-2">
+            {myVisits.map(v => (
+              <li key={v.id} className="flex gap-3 rounded-lg border border-emerald-200 bg-emerald-50/60 px-4 py-3 text-sm">
+                <CalendarCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-700" aria-hidden />
+                <div className="min-w-0 space-y-0.5">
+                  <div className="font-medium">{v.title}</div>
+                  <div>
+                    {VISIT_DAY.format(new Date(v.start))}, lecture starts {VISIT_TIME.format(new Date(v.start))}
+                    {v.teammates.length ? ` · with ${v.teammates.join(', ')}` : ''}
+                  </div>
+                  <div className="text-muted-foreground">{v.location ?? 'Room not known yet'}</div>
+                  {v.status === 'planned' && (
+                    <div className="text-xs text-muted-foreground">Please keep this time free. We still confirm it with the lecturer and let you know if anything changes.</div>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <ol className="grid gap-2 sm:grid-cols-2">
         {STEPS.map((step, index) => (

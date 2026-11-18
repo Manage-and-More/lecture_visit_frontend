@@ -1,9 +1,9 @@
 /**
  * Matches members to the target lectures (model and goal: src/lib/scheduling/assign.ts).
- * Read-only: prints the plan, optionally writes a CSV.
+ * Prints the plan, optionally writes a CSV; --apply saves it as planned visits.
  *
  *   npm run -s visits:assign -- [--until=2026-12-03] [--from=YYYY-MM-DD] [--max-per-person=2]
- *       [--max-per-day=1] [--window=30] [--csv=/path/out.csv]
+ *       [--max-per-day=1] [--window=30] [--csv=/path/out.csv] [--apply]
  *
  * --from defaults to the day after tomorrow (notice for the lecturer); --window is how many
  * minutes from the start of the session a member must be free. Only confirmed availability
@@ -29,6 +29,7 @@ const maxPerPerson = Number(arg('max-per-person') ?? 2)
 const maxPerDay = Number(arg('max-per-day') ?? 1)
 const windowMinutes = Number(arg('window') ?? 30)
 const csvPath = arg('csv')
+const apply = process.argv.includes('--apply')
 
 async function main() {
   const db = createAdminClient()
@@ -99,6 +100,22 @@ async function main() {
     for (const v of result.visits) lines.push([v.lectureId, title.get(v.lectureId), v.label, v.start.toISOString(), v.location, v.memberId, names.get(v.memberId)].map(esc).join(','))
     writeFileSync(csvPath, '﻿' + lines.join('\n'))
     console.log(`\nCSV: ${csvPath}`)
+  }
+
+  if (apply && result.visits.length) {
+    const { data: param } = await db.from('parameters').select('value').eq('key', 'active_semester').single()
+    const semester = (param?.value as string | undefined) ?? 'WiSe 2026/27'
+    const { error: insertError } = await db.from('visits').insert(result.visits.map(v => ({
+      lecture_id: v.lectureId,
+      semester,
+      scheduled_for: v.start.toISOString(),
+      location: v.location,
+      status: 'planned',
+      assignee_ids: [v.memberId],
+      notes: `Assigned by the visit optimizer (session ${v.label}); to be confirmed with the lecturer`,
+    })))
+    if (insertError) throw insertError
+    console.log(`\nSaved ${result.visits.length} planned visits (${semester}).`)
   }
 }
 main().catch(e => { console.error(e); process.exit(1) })
