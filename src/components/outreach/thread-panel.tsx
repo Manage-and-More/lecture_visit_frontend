@@ -11,6 +11,7 @@ import {
   type OutreachThread,
 } from '@/app/actions/outreach'
 import { cn } from '@/lib/utils'
+import { plainText } from '@/lib/outreach/templates'
 import type { EmailMessage, OutreachThreadStatus } from '@/types/database'
 import { STATUS_CLASS, STATUS_LABEL, formatDateTime } from './status'
 
@@ -113,7 +114,7 @@ export function ThreadPanel({ thread, onClose }: Props) {
           <section className="rounded-lg border p-3 space-y-2">
             <div className="text-xs text-muted-foreground">Preview with the current template</div>
             <div className="font-medium">{preview.subject}</div>
-            <pre className="whitespace-pre-wrap font-sans">{preview.body}</pre>
+            <pre className="whitespace-pre-wrap font-sans">{plainText(preview.body)}</pre>
           </section>
         )}
 
@@ -145,7 +146,7 @@ export function ThreadPanel({ thread, onClose }: Props) {
               {m.error && <p className="text-xs text-red-700">{m.error}</p>}
               {m.subject && <div className="font-medium">{m.subject}</div>}
               {m.body
-                ? <pre className="whitespace-pre-wrap font-sans text-[13px] max-h-64 overflow-auto">{m.body}</pre>
+                ? <pre className="whitespace-pre-wrap font-sans text-[13px] max-h-64 overflow-auto">{plainText(m.body)}</pre>
                 : <p className="text-xs text-muted-foreground">Text is filled in from the template when it&apos;s sent.</p>}
             </article>
           ))}
