@@ -11,7 +11,9 @@
     "outreach:apply": "tsx scripts/outreach/apply.ts",
     "screening:score": "tsx scripts/screening/score.ts",
     "mail:bridge": "tsx scripts/mail-bridge/run.ts",
-    "screening:optimize": "tsx scripts/screening/optimize.ts"
+    "screening:optimize": "tsx scripts/screening/optimize.ts",
+    "visits:assign": "tsx scripts/scheduling/assign.ts",
+    "visits:invite": "tsx scripts/scheduling/send-invites.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.6.0",
