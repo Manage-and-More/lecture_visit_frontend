@@ -72,6 +72,21 @@ export function findUnfilled(text: string): string | null {
   return brace ? brace[0] : null
 }
 
+const BOLD_RE = /\*\*([^*\n]+)\*\*/g
+
+/** Templates may mark text as bold with **…**; the plain-text part of an email drops the marks. */
+export function plainText(body: string): string {
+  return body.replace(BOLD_RE, '$1')
+}
+
+/** The HTML part of an email: paragraphs, line breaks and **bold** from the template text. */
+export function htmlBody(body: string): string {
+  const escape = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  const paragraphs = body.trim().split(/\n{2,}/)
+    .map(p => `<p style="margin:0 0 1em">${escape(p).replace(BOLD_RE, '<strong>$1</strong>').replace(/\n/g, '<br>')}</p>`)
+  return `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.5">${paragraphs.join('')}</div>`
+}
+
 export type TemplateKind = 'request' | 'followup' | 'ack_yes' | 'ack_no' | 'confirmation'
 
 export function templateFor(settings: MailSettings, kind: TemplateKind): string {

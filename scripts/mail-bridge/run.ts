@@ -33,6 +33,7 @@ import { ImapFlow } from 'imapflow'
 import { simpleParser } from 'mailparser'
 import nodemailer from 'nodemailer'
 import MailComposer from 'nodemailer/lib/mail-composer'
+import { htmlBody, plainText } from '@/lib/outreach/templates'
 import { createAdminClient } from '@/lib/supabase/admin'
 import {
   getSettings, leaseOutbox, processInbound, queueFollowups, recordSent, storeInbound,
@@ -128,7 +129,8 @@ async function main() {
             to,
             cc: cc.length ? cc : undefined,
             subject: item.subject,
-            text: item.body,
+            text: plainText(item.body),
+            html: htmlBody(item.body),
             messageId,
             inReplyTo: inReplyTo ? bracket(inReplyTo) : undefined,
             references: inReplyTo ? [...new Set([threadKey, inReplyTo].filter(Boolean).map(id => bracket(id!)))] : undefined,
