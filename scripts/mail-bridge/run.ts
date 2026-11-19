@@ -33,7 +33,7 @@ import { ImapFlow } from 'imapflow'
 import { simpleParser } from 'mailparser'
 import nodemailer from 'nodemailer'
 import MailComposer from 'nodemailer/lib/mail-composer'
-import { htmlBody, plainText } from '@/lib/outreach/templates'
+import { attachmentsOf, htmlBody, plainText } from '@/lib/outreach/templates'
 import { createAdminClient } from '@/lib/supabase/admin'
 import {
   getSettings, leaseOutbox, processInbound, queueFollowups, recordSent, storeInbound,
@@ -44,6 +44,17 @@ const KEYCHAIN_SERVICE = 'lecture-visit-tum-mail'
 const IMAP_HOST = 'xmail.mwn.de'
 const SMTP_HOST = 'postout.lrz.de'
 const STATE_FILE = path.join(os.homedir(), '.config', 'lecture-visit', 'mail-bridge.json')
+/** Files named in "[[attach: …]]" lines come from here (outside the repo) */
+const ATTACHMENTS_DIR = process.env.LECTURE_VISIT_ATTACHMENTS ?? path.resolve(process.cwd(), '../lecture_visit_data/attachments')
+
+/** The attachments an email names; throws (so the email isn't sent) if one is missing. */
+function resolveAttachments(files: string[]): { filename: string; path: string }[] {
+  return files.map(name => {
+    const file = path.join(ATTACHMENTS_DIR, path.basename(name))
+    if (!existsSync(file)) throw new Error(`Attachment not found: ${file}`)
+    return { filename: path.basename(name), path: file }
+  })
+}
 const OVERLAP_MS = 15 * 60_000
 /** Pause between two emails of a run: 10 s with a random ±3 s, so sending doesn't look like a burst */
 const SEND_GAP_MS = 10_000
@@ -134,13 +145,16 @@ async function main() {
           const messageId = `<${randomUUID()}@${domain}>`
           const to = testTo ? [testTo] : item.to
           const cc = testTo ? [] : item.cc
+          const { body: mailBody, files } = attachmentsOf(item.body)
+          const attachments = resolveAttachments(files)
           const raw = await new MailComposer({
             from: { name: item.senderName, address: from },
             to,
             cc: cc.length ? cc : undefined,
             subject: item.subject,
-            text: plainText(item.body),
-            html: htmlBody(item.body),
+            text: plainText(mailBody),
+            html: htmlBody(mailBody),
+            attachments: attachments.length ? attachments : undefined,
             messageId,
             inReplyTo: inReplyTo ? bracket(inReplyTo) : undefined,
             references: inReplyTo ? [...new Set([threadKey, inReplyTo].filter(Boolean).map(id => bracket(id!)))] : undefined,

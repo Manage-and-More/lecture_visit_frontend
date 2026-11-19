@@ -65,11 +65,23 @@ export function render(template: string, values: Record<string, string>): string
  * Text a person still has to write ("[EIN SATZ …]") or a placeholder that wasn't filled.
  * Emails containing either are never sent.
  */
-export function findUnfilled(text: string): string | null {
+export function findUnfilled(raw: string): string | null {
+  const text = attachmentsOf(raw).body
   const bracket = text.match(/\[[^\]\n]*[A-ZÄÖÜ]{4,}[^\]\n]*\]/)
   if (bracket) return bracket[0]
   const brace = text.match(/\{[a-z_]+\}/)
   return brace ? brace[0] : null
+}
+
+const ATTACH_RE = /^\[\[attach:\s*(.+?)\s*\]\]\s*$/gm
+
+/**
+ * Lines "[[attach: file name.pdf]]" in an email body name files the mail bridge attaches from
+ * its local attachments folder. Returns the body without those lines and the file names.
+ */
+export function attachmentsOf(body: string): { body: string; files: string[] } {
+  const files = [...body.matchAll(ATTACH_RE)].map(m => m[1])
+  return { body: files.length ? body.replace(ATTACH_RE, '').replace(/\n{3,}/g, '\n\n').trim() : body, files }
 }
 
 const BOLD_RE = /\*\*([^*\n]+)\*\*/g
