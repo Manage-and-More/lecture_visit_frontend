@@ -3,6 +3,8 @@
  * classification, updates the thread (and lecture answers), queues the automatic thank-you
  * or the given reply, and puts opt-outs on the do-not-contact list. Emails go out with the
  * next Gmail check-in, within the sending mode and daily limit.
+ * "answeredOutside": true means the organiser answers this reply from their own mail program
+ * (e.g. with an attachment): the decision is stored, but no email is queued.
  *
  *   npx tsx scripts/outreach/apply.ts decisions.json [--dry-run]
  */
@@ -18,7 +20,8 @@ const DecisionsSchema = z.array(z.object({
   messageId: z.string().uuid(),
   classification: ClassificationSchema,
   reply: z.string().min(1).optional(),
-}))
+  answeredOutside: z.boolean().optional(),
+}).refine(d => !(d.reply && d.answeredOutside), 'Give either a reply or answeredOutside, not both'))
 
 async function main() {
   const file = process.argv[2]
@@ -44,7 +47,7 @@ async function main() {
       continue
     }
     const c = decision.classification as ReplyClassification
-    const plan = `${c.category} (${c.confidence})${c.needs_human ? ', flagged for a person' : ''}${decision.reply ? ', reply queued' : ''}`
+    const plan = `${c.category} (${c.confidence})${c.needs_human ? ', flagged for a person' : ''}${decision.reply ? ', reply queued' : ''}${decision.answeredOutside ? ', answered outside the tool' : ''}`
     if (dryRun) {
       console.log(`- ${decision.messageId} from ${inbound.from_email}: would apply ${plan}`)
       continue
@@ -53,7 +56,7 @@ async function main() {
     await db.from('email_messages')
       .update({ classification: c, classified_at: new Date().toISOString(), processing_error: null })
       .eq('id', inbound.id)
-    await applyClassification(db, settings, inbound, c, { skipAutoReply: Boolean(decision.reply) })
+    await applyClassification(db, settings, inbound, c, { skipAutoReply: Boolean(decision.reply || decision.answeredOutside) })
     if (decision.reply) await queueReplyTo(db, inbound, decision.reply)
 
     const { data: thread } = await db.from('professor_outreach')
