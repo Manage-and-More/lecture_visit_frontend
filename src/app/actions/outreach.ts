@@ -13,6 +13,8 @@ import type {
 export type OutreachThread = ProfessorOutreach & {
   professor: { first_name: string | null; last_name: string | null; title: string | null } | null
   lectures: { response: string; position: number; lecture: { id: string; title: string } | null }[]
+  /** The visit this thread proposes (the open one if there is one), and who goes */
+  visit: { start: string | null; status: string; assignees: string[] } | null
 }
 
 export type OutreachOverview = {
@@ -48,7 +50,7 @@ export async function getOutreachOverview(): Promise<OutreachOverview> {
     supabase.from('email_messages').select('id', { count: 'exact', head: true })
       .eq('direction', 'outbound').eq('status', 'queued'),
     supabase.from('professor_outreach')
-      .select('*, professor:professors(first_name, last_name, title), lectures:outreach_lectures(response, position, lecture:lectures(id, title))')
+      .select('*, professor:professors(first_name, last_name, title), lectures:outreach_lectures(response, position, lecture:lectures(id, title)), visits(scheduled_for, status, assignee_ids)')
       .eq('semester', semester)
       .order('updated_at', { ascending: false })
       .limit(1000),
@@ -65,8 +67,28 @@ export async function getOutreachOverview(): Promise<OutreachOverview> {
     unreadReplies: unreadReplies ?? 0,
     aiReading: aiReadingEnabled(),
     bridgeHealthy: !!settings.last_bridge_at && Date.now() - new Date(settings.last_bridge_at).getTime() < 15 * 60_000,
-    threads: (threads ?? []) as unknown as OutreachThread[],
+    threads: await withVisits(supabase, (threads ?? []) as unknown as ThreadRow[]),
   }
+}
+
+type ThreadRow = Omit<OutreachThread, 'visit'> & {
+  visits: { scheduled_for: string | null; status: string; assignee_ids: string[] }[]
+}
+
+/** Picks each thread's visit (an open one before a cancelled one) and names its members. */
+async function withVisits(supabase: Awaited<ReturnType<typeof createClient>>, rows: ThreadRow[]): Promise<OutreachThread[]> {
+  const ids = [...new Set(rows.flatMap(r => r.visits.flatMap(v => v.assignee_ids)))]
+  const { data: profiles } = ids.length
+    ? await supabase.from('profiles').select('id, display_name, email').in('id', ids)
+    : { data: [] }
+  const names = new Map((profiles ?? []).map(p => [p.id as string, ((p.display_name as string | null)?.trim() || (p.email as string | null)) ?? 'Member']))
+  return rows.map(({ visits, ...thread }) => {
+    const v = [...visits].sort((a, b) => Number(a.status === 'cancelled') - Number(b.status === 'cancelled'))[0]
+    return {
+      ...thread,
+      visit: v ? { start: v.scheduled_for, status: v.status, assignees: v.assignee_ids.map(id => names.get(id) ?? 'Member') } : null,
+    }
+  })
 }
 
 export async function getThreadMessages(outreachId: string): Promise<EmailMessage[]> {

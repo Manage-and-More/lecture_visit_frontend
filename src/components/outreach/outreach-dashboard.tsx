@@ -12,6 +12,9 @@ import { TemplateEditor } from './template-editor'
 import { ThreadPanel } from './thread-panel'
 import { STATUS_CLASS, STATUS_LABEL, STATUS_ORDER, formatDateTime } from './status'
 
+const VISIT_TIME = new Intl.DateTimeFormat('en-GB', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Europe/Berlin' })
+const VISIT_STATUS: Record<string, string> = { planned: 'waiting for the lecturer', confirmed: 'confirmed', done: 'done', cancelled: 'cancelled' }
+
 type Props = {
   overview: OutreachOverview
   settings: MailSettings
@@ -67,6 +70,7 @@ export function OutreachDashboard({ overview, settings }: Props) {
                   <TableRow>
                     <TableHead>Lecturer</TableHead>
                     <TableHead>Lectures</TableHead>
+                    <TableHead>Visit</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Summary</TableHead>
                     <TableHead className="whitespace-nowrap">Updated</TableHead>
@@ -83,6 +87,16 @@ export function OutreachDashboard({ overview, settings }: Props) {
                       </TableCell>
                       <TableCell className="align-top text-sm max-w-[260px]">
                         {t.lectures.map(l => l.lecture?.title).filter(Boolean).join(', ')}
+                      </TableCell>
+                      <TableCell className="align-top text-sm whitespace-nowrap">
+                        {t.visit ? (
+                          <div className={cn(t.visit.status === 'cancelled' && 'text-muted-foreground line-through')}>
+                            <div className="font-medium">{t.visit.assignees.join(', ') || 'Nobody assigned'}</div>
+                            <div className="text-xs text-muted-foreground">
+                              {t.visit.start ? VISIT_TIME.format(new Date(t.visit.start)) : 'No date'} · {VISIT_STATUS[t.visit.status] ?? t.visit.status}
+                            </div>
+                          </div>
+                        ) : <span className="text-xs text-muted-foreground">No visit</span>}
                       </TableCell>
                       <TableCell className="align-top">
                         <span className={cn('whitespace-nowrap rounded-md px-2 py-0.5 text-xs font-medium', STATUS_CLASS[t.status])}>
