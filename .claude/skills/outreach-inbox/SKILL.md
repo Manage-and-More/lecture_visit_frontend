@@ -42,7 +42,10 @@ set -a; source ../tum_scraper/.env; set +a
    without `--dry-run`. Report the resulting thread statuses and how many emails were queued.
    Mention the sending mode it printed: in "off" mode queued emails wait, in "test" mode they
    go to the sender's own address. Then run `npm run -s mail:bridge` once more so the queued
-   emails go out now (unless the user prefers to wait for the scheduled run).
+   emails go out now (unless the user prefers to wait for the scheduled run). That run also
+   emails the members of every newly confirmed visit that it is confirmed (in "live" mode);
+   say who was told. If a confirmation changes the time or place (e.g. "be there 15 minutes
+   early"), also send that member an updated calendar entry.
 
 ## Reference
 
