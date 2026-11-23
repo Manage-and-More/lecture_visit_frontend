@@ -34,6 +34,7 @@ import { simpleParser } from 'mailparser'
 import nodemailer from 'nodemailer'
 import MailComposer from 'nodemailer/lib/mail-composer'
 import { attachmentsOf, htmlBody, plainText } from '@/lib/outreach/templates'
+import { sendVisitConfirmations } from '../scheduling/member-mail'
 import { createAdminClient } from '@/lib/supabase/admin'
 import {
   getSettings, leaseOutbox, processInbound, queueFollowups, recordSent, storeInbound,
@@ -226,6 +227,7 @@ async function main() {
 
     if (dryRun) {
       inbound.forEach(i => console.log(`  would store: ${i.from} | ${i.subject}`))
+      if (settings.mode === 'live') await sendVisitConfirmations(db, settings, null, { dryRun: true })
       return
     }
 
@@ -233,9 +235,11 @@ async function main() {
     const stored = await storeInbound(db, inbound)
     const classified = await processInbound(db, settings, 35_000)
     const followups = settings.mode === 'off' ? 0 : await queueFollowups(db, settings)
+    // Members hear as soon as their visit is confirmed (not in test mode: those are real people)
+    const confirmations = settings.mode === 'live' ? await sendVisitConfirmations(db, settings, smtp) : 0
     await db.from('mail_settings').update({ last_bridge_at: new Date().toISOString(), last_bridge_error: null }).eq('id', true)
     writeState({ lastInboundCheck: startedAt.toISOString() })
-    console.log(`Stored ${stored} replies, classified ${classified}, queued ${followups} reminders.`)
+    console.log(`Stored ${stored} replies, classified ${classified}, queued ${followups} reminders, sent ${confirmations} visit confirmations to members.`)
   } finally {
     await imap.logout().catch(() => {})
   }
